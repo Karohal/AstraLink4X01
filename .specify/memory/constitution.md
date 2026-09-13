@@ -1,21 +1,17 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 1.1.0
+- Version change: 1.2.0 → 1.2.1
 - Modified principles:
-  - I. Développement par phases — scope de la Phase 1 redéfini : « un seul système solaire »
-    → « une seule planète » ; contenu détaillé (exploration, extraction de ressources,
-    construction, développement de la civilisation, économie et industrie), toujours sans
-    réseau.
+  - III. Conventions de code et structure cohérentes — la clause rendant la liste de dossiers
+    `Scripts/` non-exhaustive (introduite en 1.2.0) nomme désormais explicitement, dans le texte
+    du principe lui-même (plus seulement dans un changelog), les modules identifiés par le plan
+    de la Phase 1 : `FogOfWar`, `Research`, `Colonists`, `Logistics`, `Civilization`.
 - Added sections: none
 - Removed sections: none
-- Bump rationale: MINOR — le cadre à 4 phases et les 5 principes restent inchangés ; seule la
-  description du contenu de la Phase 1 est précisée/affinée (réduction du périmètre physique
-  initial de « système » à « planète » et ajout de sous-systèmes de jeu attendus), sans
-  supprimer ni redéfinir la structure de gouvernance elle-même.
+- Bump rationale: PATCH — ajoute des exemples illustratifs à une règle déjà en vigueur depuis
+  1.2.0 ; ne change ni la portée ni le sens de la règle.
 - Templates requiring follow-up: none checked automatically by this command (out of scope).
-- Follow-up TODOs: none. Note (non-governance, informative only): CLAUDE.md décrit encore la
-  Phase 1 comme « un seul système solaire » — à aligner manuellement si souhaité (hors
-  périmètre de cette commande, qui ne modifie que la constitution).
+- Follow-up TODOs: none.
 -->
 
 # AstraLink4X Constitution
@@ -54,9 +50,13 @@ de porter la simulation vers un serveur dédié sans réécrire la logique méti
 - PascalCase pour classes/méthodes publiques, camelCase avec préfixe `_` pour les variables
   privées.
 - Un ScriptableObject par type de donnée de configuration (ressources, bâtiments, unités).
-- Structure des dossiers Unity fixée : `Assets/_Project/Scripts/{Economy,Building,Procedural,
-  Core}/`, `ScriptableObjects/`, `Prefabs/`, `Scenes/` ; assets hors code dans `Art/` et
-  `Plugins/`.
+- Structure des dossiers Unity : `Assets/_Project/Scripts/<Module>/` (ex: `Economy`, `Building`,
+  `Procedural`, `Core`), `ScriptableObjects/`, `Prefabs/`, `Scenes/` ; assets hors code dans
+  `Art/` et `Plugins/`. Cette liste de modules sous `Scripts/` est INDICATIVE et NON-EXHAUSTIVE :
+  de nouveaux dossiers de module PEUVENT être ajoutés selon les besoins des features (ex:
+  `FogOfWar`, `Research`, `Colonists`, `Logistics`, `Civilization`, identifiés dans le plan de la
+  Phase 1), à condition que chacun corresponde à un namespace `Game.<Module>` dédié à un domaine
+  métier cohérent (jamais un dossier fourre-tout regroupant des responsabilités sans rapport).
 - Commentaires en français, noms de code (classes, méthodes, variables) en anglais.
 
 **Rationale** : Sur un projet solo mené sur le long terme, la cohérence des conventions est ce
@@ -118,4 +118,4 @@ modification DOIT :
 Principes I-V avant d'être commitée ; toute violation détectée DOIT être corrigée ou justifiée
 explicitement dans la spec de la feature concernée.
 
-**Version**: 1.1.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
+**Version**: 1.2.1 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
