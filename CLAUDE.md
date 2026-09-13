@@ -9,8 +9,9 @@ solo, long terme, orienté qualité plutôt que vitesse.
 Ne JAMAIS essayer d'implémenter le jeu final (galaxie complète, 200 joueurs) directement.
 Le projet avance par phases, chacune complète et jouable avant de passer à la suivante :
 
-1. **Phase 1 — Cœur de simulation (solo)** : un seul système solaire généré
-   procéduralement, exploration, construction de bâtiments, économie simple.
+1. **Phase 1 — Cœur de simulation (solo)** : une seule planète générée
+   procéduralement. Portée fonctionnelle : exploration, extraction de ressources,
+   construction, développement de la civilisation, économie et industrie.
    Aucun réseau.
 2. **Phase 2 — Multi restreint** : même contenu, serveur dédié séparé, 4-10 joueurs
    sur un système partagé.
