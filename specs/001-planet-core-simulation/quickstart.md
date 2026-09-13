@@ -10,7 +10,7 @@ comportement de bout en bout dans le jeu réel.
 
 - Unity 6000.3.9f1 ouvert sur ce projet, scène de jeu Phase 1 chargée.
 - Build/Play Mode depuis l'éditeur (pas besoin de build standalone pour valider).
-- Une partie neuve démarrée (aucune sauvegarde préalable requise pour les scénarios 1 à 9).
+- Une partie neuve démarrée (aucune sauvegarde préalable requise pour les scénarios 1 à 10).
 
 ## 1. Fonder la colonie et révéler le territoire (US1)
 
@@ -25,18 +25,24 @@ comportement de bout en bout dans le jeu réel.
 ## 2. Construire des bâtiments (US2)
 
 1. Avec le stock de départ, sélectionner un type de bâtiment et le placer sur une zone révélée.
-2. **Attendu** : le stock de ressources diminue du coût affiché, le bâtiment apparaît.
-3. Retenter une construction dont le coût dépasse le stock disponible.
-4. **Attendu** : la construction est refusée, les ressources manquantes sont indiquées (FR-006).
+2. **Attendu** : le stock de ressources diminue du coût affiché, le bâtiment apparaît en chantier
+   (pas encore opérationnel).
+3. Sans assigner aucun colon au chantier, laisser le temps de jeu s'écouler.
+4. **Attendu** : le chantier ne progresse pas (SC-016).
+5. Assigner un colon au chantier et laisser la durée de chantier du type de bâtiment s'écouler.
+6. **Attendu** : le bâtiment devient opérationnel (SC-016).
+7. Retenter une construction dont le coût dépasse le stock disponible.
+8. **Attendu** : la construction est refusée, les ressources manquantes sont indiquées (FR-006).
 
 ## 3. Débloquer et exploiter des ressources (US3)
 
-1. Ouvrir la fenêtre de gestion des colons depuis l'abri de secours initial (cf. scénario 9).
+1. Ouvrir la fenêtre de gestion des colons depuis l'abri de secours initial (cf. scénario 10).
 2. Assigner un colon au métier de chercheur.
 3. Laisser le temps de jeu s'écouler jusqu'au déblocage d'une technologie d'extraction.
 4. Tenter de construire un extracteur sur le gisement correspondant AVANT le déblocage : doit être
-   refusé (FR-009). Après déblocage : doit réussir.
-5. **Attendu** : une fois l'extracteur construit, le stock de la ressource associée augmente
+   refusé (FR-009). Après déblocage : doit réussir (l'extracteur passe par l'état chantier du
+   scénario 2 avant de produire).
+5. **Attendu** : une fois l'extracteur opérationnel, le stock de la ressource associée augmente
    progressivement à son point de production (SC-002).
 
 ## 4. Transporter les ressources (US4)
@@ -65,9 +71,26 @@ comportement de bout en bout dans le jeu réel.
    avec des colons peu compétents/en mauvaise santé : le second doit produire moins malgré 100%
    de postes occupés (SC-008).
 
-## 7. Former les colons via l'université (US7)
+## 7. Faire naître de nouveaux colons par cohabitation en logement (US7)
 
-1. Faire progresser la colonie jusqu'au palier débloquant l'université, puis la construire.
+1. Construire un logement et y loger un homme et une femme.
+2. Avancer le temps de jeu d'une année continue sans toucher aux ressources ni à la trésorerie.
+3. **Attendu** : un nouveau colon naît, avec un genre déterminé aléatoirement (SC-017).
+4. Dans une partie où la trésorerie est négative ou les ressources vitales à zéro, répéter le même
+   test de cohabitation.
+5. **Attendu** : la naissance a lieu normalement, sans être bloquée par l'état économique (SC-017).
+6. Faire naître plusieurs colons de suite et observer le ratio hommes/femmes de la colonie.
+7. **Attendu** : le ratio reste proche de 50/50 (± 10%), le genre sous-représenté étant favorisé
+   en cas d'écart (SC-018).
+8. Faire cohabiter un couple pendant moins d'un an, interrompre la cohabitation (déplacer un
+   colon), puis la reprendre.
+9. **Attendu** : le décompte de la durée de cohabitation continue redémarre à zéro après
+   l'interruption (aucune naissance anticipée par cumul de périodes discontinues).
+
+## 8. Former les colons via l'université (US8)
+
+1. Faire progresser la colonie jusqu'au palier débloquant l'université, puis la construire (en
+   respectant le mécanisme de chantier du scénario 2).
 2. Assigner un colon disponible à une formation ciblant un métier.
 3. **Attendu** : un coût est déduit de la trésorerie, la compétence progresse plus vite et
    au-delà du plafond de l'apprentissage sur le tas (SC-007).
@@ -75,22 +98,24 @@ comportement de bout en bout dans le jeu réel.
 5. **Attendu** : la formation s'arrête immédiatement, la compétence acquise est conservée
    (FR-025).
 
-## 8. Développer la civilisation (US8)
+## 9. Développer la civilisation (US9)
 
 1. Maintenir la colonie approvisionnée et financièrement positive sur plusieurs cycles.
-2. **Attendu** : la population/le niveau de développement progresse, débloquant un nouveau
-   bâtiment ou une capacité (SC-009).
+2. **Attendu** : le niveau de développement progresse, débloquant un nouveau bâtiment ou une
+   capacité (SC-009). La population continue d'évoluer indépendamment via les naissances
+   (scénario 7), y compris pendant ce test.
 3. À l'inverse, dans une partie séparée, priver la colonie de ressources vitales et laisser la
    trésorerie négative durablement.
 4. **Attendu** : la colonie entre en état d'échec (effondrement), clairement signalé au joueur ;
-   aucun état de victoire n'existe (SC-015).
+   aucun état de victoire n'existe (SC-015). Vérifier que les naissances en logement (scénario 7)
+   continuent malgré l'effondrement du niveau de développement.
 
-## 9. Consulter et gérer chaque colon individuellement (US9)
+## 10. Consulter et gérer chaque colon individuellement (US10)
 
 1. Depuis l'abri de secours initial, ouvrir la fenêtre de gestion.
 2. **Attendu** : la liste des ressources disponibles et la liste des colons par nom s'affichent
    (SC-013).
-3. Cliquer sur un colon : sa fiche détaillée doit afficher santé, compétence par métier,
+3. Cliquer sur un colon : sa fiche détaillée doit afficher genre, santé, compétence par métier,
    éducation/formation en cours, ethnie et biographie.
 4. Basculer son mode d'assignation entre manuel et automatique via le contrôle dédié.
 5. **Attendu** : le mode choisi est respecté par le système d'assignation (SC-012).
@@ -101,9 +126,10 @@ comportement de bout en bout dans le jeu réel.
 
 ## Validation transverse
 
-- **Sauvegarde/chargement** (SC-010) : à n'importe quel moment des scénarios 1 à 9, sauvegarder
-  puis recharger la partie et vérifier qu'aucun état n'est perdu ou incohérent.
-- **Hors ligne** (SC-011) : dérouler l'intégralité des scénarios 1 à 9 sans connexion réseau
+- **Sauvegarde/chargement** (SC-010) : à n'importe quel moment des scénarios 1 à 10 (y compris en
+  cours de chantier ou de cohabitation), sauvegarder puis recharger la partie et vérifier qu'aucun
+  état n'est perdu ou incohérent.
+- **Hors ligne** (SC-011) : dérouler l'intégralité des scénarios 1 à 10 sans connexion réseau
   active, aucune fonctionnalité ne doit être bloquée.
 - **Hors périmètre** : vérifier qu'aucune option militaire/combat n'est accessible en Phase 1
   (Out of Scope du spec).

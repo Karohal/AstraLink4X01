@@ -9,12 +9,14 @@
 ## Summary
 
 Boucle de jeu solo en vue de gestion (god mode) sur une planète unique générée procéduralement :
-brouillard de guerre dissipé par la construction, recherche/extraction de ressources, transport
+brouillard de guerre dissipé par la construction (chantiers progressifs nécessitant de la
+main-d'œuvre, catalogue de bâtiments extensible), recherche/extraction de ressources, transport
 manuel, industrie/production, emploi/fiscalité avec compétence et santé des colons, université,
-développement de la civilisation, gestion/identité des colons — le tout hors ligne, sans militaire
-ni multijoueur. Approche technique : simulation en temps réel (pause possible) pilotée par des
-services C# purs par module (`Game.<Module>`), orchestrés par des `MonoBehaviour` légers, avec
-sauvegarde locale en JSON et UI via Unity UI Toolkit.
+naissance de colons par cohabitation en logement (indépendante de l'économie), développement de la
+civilisation, gestion/identité des colons — le tout hors ligne, sans militaire ni multijoueur.
+Approche technique : simulation en temps réel (pause possible) pilotée par des services C# purs
+par module (`Game.<Module>`), orchestrés par des `MonoBehaviour` légers, avec sauvegarde locale en
+JSON et UI via Unity UI Toolkit.
 
 ## Technical Context
 
@@ -50,9 +52,9 @@ sauvegarde locale en JSON et UI via Unity UI Toolkit.
 
 **Post-Design Re-check** (après Phase 0/1) : `data-model.md` et `contracts/` confirment que toute
 la logique (services `I*Service`) reste indépendante d'Unity (Principe II, PASS) et suit les
-namespaces `Game.<Module>` retenus ci-dessus (Principe III, PASS avec la même note sur
-l'extension de la liste de dossiers). Aucune mécanique militaire, multijoueur ou hors périmètre
-Phase 1 n'a été introduite par le design (Principe I, PASS). Aucun nouveau gate n'est déclenché.
+namespaces `Game.<Module>` retenus ci-dessus (Principe III, PASS — constitution v1.2.1). Aucune
+mécanique militaire, multijoueur ou hors périmètre Phase 1 n'a été introduite par le design
+(Principe I, PASS). Aucun nouveau gate n'est déclenché.
 
 ## Project Structure
 

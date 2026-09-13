@@ -4,7 +4,11 @@ Entités extraites de la section *Key Entities* de [spec.md](./spec.md), avec ch
 transitions d'état. Modélisation en classes C# pures (`Game.<Module>`), sans dépendance Unity,
 conformément au Principe II de la Constitution. Les valeurs numériques précises (rayons, plafonds,
 coûts, seuils) sont des paramètres de configuration (ScriptableObject) à ajuster en équilibrage —
-seuls les champs et leur rôle sont fixés ici.
+seuls les champs et leur rôle sont fixés ici. Les noms de champs/entités ci-dessous sont donnés en
+français pour la lisibilité de conception ; conformément au Principe III (noms de code en anglais),
+l'implémentation C# DOIT utiliser des identifiants anglais équivalents (ex: `Genre` → `Gender`,
+`Sante` → `Health`, `ModeAssignation` → `AssignmentMode`), comme le font déjà `contracts/
+core-interfaces.md` et les chemins de fichiers de `tasks.md` (ex: `Colonist.cs`).
 
 ## Planète (`Game.Procedural`)
 
@@ -68,20 +72,40 @@ dessus ; `EnExtraction → Epuise` quand `QuantiteRestante` atteint 0 (FR-011).
 | `Quantite` | `float` | Quantité actuellement stockée |
 | `CapaciteMax` | `float` | Capacité de stockage globale ou par bâtiment de stockage |
 
+## Catalogue de bâtiments — `BuildingDefinition` (ScriptableObject, `Game.Building`)
+
+| Champ | Type | Description |
+|---|---|---|
+| `Id` | identifiant de catalogue | Type de bâtiment |
+| `Cout` | `(RessourceId, Quantite)[]` | Coût en ressources, déduit au lancement du chantier (FR-005/FR-006) |
+| `DureeChantier` | `float` | Durée de chantier propre à ce type de bâtiment ; valeur de contenu/équilibrage, pas fixée par la spec (FR-042) |
+| `PrerequisTechnologiques` | référence(s) `TechnologyDefinition`, optionnel | Technologie(s) devant être débloquée(s) avant de pouvoir lancer ce type de bâtiment (FR-044), en plus du cas particulier des extracteurs (gisement + technologie, FR-009) |
+| `RayonBrouillard` | `int` | Rayon de dissipation du brouillard de guerre à la construction (FR-004) |
+| `PostesEmploiDefinis` | `JobDefinition[]` | Postes ouverts par ce type de bâtiment (dont chercheur, université) |
+| `EstLogement` | `bool` | Vrai si ce type de bâtiment est un logement, site du mécanisme de naissance (FR-047) |
+
+Ce catalogue est une structure de données extensible et séparée de la spec/du plan (FR-044) : de
+nouveaux `BuildingDefinition` peuvent être ajoutés au fil du développement sans modifier cette
+spécification ni le plan technique ; seul le mécanisme générique de déblocage (ressources, et le
+cas échéant technologie/gisement) reste fixé ici.
+
 ## Abri de secours initial / Bâtiment (`Game.Building`)
 
 | Champ | Type | Description |
 |---|---|---|
 | `Id` | `Guid` | Identifiant du bâtiment |
-| `DefinitionId` | référence `BuildingDefinition` (ScriptableObject) | Type de bâtiment, coût, rayon de brouillard de guerre, postes d'emploi disponibles |
+| `DefinitionId` | référence `BuildingDefinition` (ScriptableObject) | Type de bâtiment (coût, chantier, prérequis, rayon, postes — cf. ci-dessus) |
 | `Position` | `(int x, int y)` | Zone occupée |
-| `Etat` | `BatimentEtat` (enum) | `EnConstruction` → `Operationnel` ; pour les bâtiments de transformation : `Operationnel` ↔ `EnPause` (FR-016) |
-| `PostesEmploi` | `PosteEmploi[]` | Postes ouverts par ce bâtiment (dont chercheur, université) |
+| `Etat` | `BatimentEtat` (enum) | `EnChantier` → `Operationnel` ; pour les bâtiments de transformation : `Operationnel` ↔ `EnPause` (FR-016) |
+| `ProgresChantier` | `float` | Progression du chantier, de 0 à `DureeChantier` ; n'avance que si au moins un colon est assigné (FR-042/FR-043) |
+| `PostesEmploi` | `PosteEmploi[]` | Postes ouverts par ce bâtiment une fois opérationnel (dont chercheur, université) |
 | `EstAbriInitial` | `bool` | Vrai uniquement pour le bâtiment de départ (FR-007/FR-037) |
 
-**Transitions** : `EnConstruction → Operationnel` à la fin de la construction (US2) ;
-`Operationnel ↔ EnPause` pour un bâtiment de transformation selon la disponibilité des intrants ou
-la saturation du stock de sortie (FR-016).
+**Transitions** : `EnChantier → Operationnel` quand `ProgresChantier` atteint `DureeChantier`, ce
+qui ne peut arriver que pendant qu'au moins un colon est assigné au chantier (`AffectationType.
+Construction`, FR-042/FR-043) — sans colon assigné, `ProgresChantier` n'évolue pas mais ne régresse
+pas non plus. `Operationnel ↔ EnPause` pour un bâtiment de transformation selon la disponibilité
+des intrants ou la saturation du stock de sortie (FR-016).
 
 ## Chaîne de production / Recette (`Game.Economy`)
 
@@ -98,12 +122,14 @@ la saturation du stock de sortie (FR-016).
 |---|---|---|
 | `Id` | `Guid` | Identifiant unique |
 | `Nom` | `string` | Généré automatiquement, renommable (FR-039) |
+| `Genre` | `Genre` (enum `Homme` \| `Femme`) | Attribué à la création ; ~50/50 pour la population initiale (FR-045/FR-046), tiré avec rééquilibrage de quota pour un nouveau-né (FR-048) |
 | `EthnieId` | référence `EthnicityDefinition` (ScriptableObject) | Héritée de la colonie à la naissance (FR-040) |
 | `Biographie` | `string` (≤ 300 caractères) | Libre, optionnelle, vide par défaut, saisie bornée côté UI (FR-041), aucun effet gameplay |
 | `Sante` | `float` (0–1 ou 0–100) | Influence le rendement (FR-026) |
 | `Competences` | `Dictionary<MetierId, NiveauCompetence>` | Un niveau par métier possible (FR-020) |
 | `ModeAssignation` | `ModeAssignation` (enum `Manuel` \| `Automatique`) | Par colon, modifiable à tout moment (FR-035) |
-| `AffectationActuelle` | `Affectation?` | Poste d'emploi, tâche de transport, ou formation en cours ; `null` = chômage |
+| `AffectationActuelle` | `Affectation?` | Poste d'emploi, tâche de transport, chantier, ou formation en cours ; `null` = chômage |
+| `LogementId` | `Guid?` | Bâtiment d'habitation où réside ce colon, indépendant de `AffectationActuelle` (un colon peut être employé ailleurs que là où il loge) ; utilisé par la Cohabitation de logement (FR-047) |
 
 ### Niveau de compétence (`Game.Colonists`)
 
@@ -131,8 +157,20 @@ ne régresse pas en Phase 1 (non requis par le spec).
 
 | Champ | Type | Description |
 |---|---|---|
-| `Type` | `AffectationType` (enum `Emploi` \| `Transport` \| `Formation`) | Nature de l'affectation |
-| `CibleId` | `Guid` | Poste, tâche de transport, ou formation concernée |
+| `Type` | `AffectationType` (enum `Emploi` \| `Transport` \| `Construction` \| `Formation`) | Nature de l'affectation ; `Construction` désigne un colon assigné à faire progresser le chantier d'un bâtiment (FR-043) |
+| `CibleId` | `Guid` | Poste, tâche de transport, bâtiment en chantier, ou formation concernée |
+
+## Cohabitation de logement (`Game.Colonists`)
+
+| Champ | Type | Description |
+|---|---|---|
+| `BatimentId` | référence `Batiment` (logement, `EstLogement = true`) | Logement concerné |
+| `DureeCohabitationContinue` | `float` | Temps continu écoulé depuis qu'au moins un `Colon` de genre `Homme` et un de genre `Femme` ont `LogementId` pointant vers ce bâtiment ; remis à zéro dès que cette condition n'est plus vraie (FR-047) |
+
+**Transitions** : une naissance est déclenchée quand `DureeCohabitationContinue` atteint un an de
+temps de jeu (FR-047) ; le nouveau colon créé via `IColonistIdentityService.CreateColonist` hérite
+de l'ethnie de la `Colonie` (FR-040) et reçoit un genre tiré aléatoirement avec rééquilibrage de
+quota (FR-048), indépendamment de l'état des ressources/de la trésorerie de la colonie (FR-049).
 
 ## Tâche de transport (`Game.Logistics`)
 
@@ -162,15 +200,19 @@ place (Edge Case).
 | Champ | Type | Description |
 |---|---|---|
 | `Nom` | `string` | Donné par le joueur à la fondation ; sert d'ethnie par défaut héritée par les nouveau-nés |
-| `NiveauDeveloppement` | `int` | Palier courant (FR-028/FR-029) |
+| `NiveauDeveloppement` | `int` | Palier courant, fonction des ressources/trésorerie (FR-028/FR-029) — n'inclut PAS la population, qui évolue séparément via les naissances |
 | `ProgresDeveloppement` | `float` | Progression vers le palier suivant |
-| `Etat` | `ColonieEtat` (enum) | `EnCroissance` → `Stagnation` → `Effondrement` (FR-030/FR-036, US8) |
+| `Etat` | `ColonieEtat` (enum) | `EnCroissance` → `Stagnation` → `Effondrement`, relatif au `NiveauDeveloppement` uniquement (FR-030/FR-036, US9) |
+| `Population` (dérivé) | `int` | Nombre de `Colon` vivants, alimenté exclusivement par la dotation initiale et le mécanisme de naissance (FR-046/FR-047), indépendamment de `Etat`/`NiveauDeveloppement` |
+| `RatioGenre` (dérivé) | `float` | Proportion hommes/femmes courante parmi les `Colon`, recalculée à chaque naissance pour le rééquilibrage de quota (FR-048) |
 
 **Transitions** : `EnCroissance → Stagnation` quand un besoin de base ou la trésorerie n'est plus
 couvert (FR-030) ; `Stagnation → Effondrement` si la situation critique persiste au-delà d'un seuil
 (FR-036, paramètre d'équilibrage) ; `Stagnation → EnCroissance` si la situation redevient positive
 avant l'effondrement (comportement symétrique implicite de FR-030, à confirmer en tasks/tests) ;
 `Effondrement` est un état terminal d'échec pour la partie (pas de condition de victoire, FR-036).
+Ces transitions ne concernent que `NiveauDeveloppement` : `Population` continue d'évoluer via les
+naissances (Cohabitation de logement) même en `Stagnation` ou `Effondrement` (FR-028/FR-049).
 
 ## Relations principales
 
@@ -183,3 +225,6 @@ avant l'effondrement (comportement symétrique implicite de FR-030, à confirmer
   véhicule assigné.
 - `Recette` 1—1 `Batiment` (bâtiment de transformation) ; N `RessourceDefinition` en entrée/sortie.
 - `Colonie` 1—1 `Tresorerie` ; `Colonie` 1—N `Colon` ; `Colonie` 1—1 `Planete`.
+- `Batiment` 1—1 `BuildingDefinition` (catalogue) ; `BuildingDefinition` 0..N `TechnologyDefinition` (prérequis, FR-044).
+- `Batiment` (logement, `EstLogement = true`) 1—1 `Cohabitation de logement` ; `Colon` 0..1 `LogementId` référençant un tel `Batiment` (0..N `Colon` résidents par logement).
+- `Colon` 0..1 `Affectation` de type `Construction` ciblant un `Batiment` en état `EnChantier`.

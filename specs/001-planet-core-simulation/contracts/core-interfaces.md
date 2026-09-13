@@ -52,8 +52,13 @@ public interface IFogOfWarService
 ```csharp
 public interface IBuildingPlacementService
 {
-    bool CanBuild(Planet planet, BuildingDefinition definition, int x, int y, Inventory inventory);
-    Building Build(Planet planet, BuildingDefinition definition, int x, int y, Inventory inventory); // FR-005/FR-006
+    bool CanBuild(Planet planet, BuildingDefinition definition, int x, int y, Inventory inventory); // vérifie le coût (FR-006) ; le catalogue peut aussi porter des PrerequisTechnologiques (FR-044) pour de futurs types de bâtiments, sans que cela soit exercé par le contenu connu de la Phase 1 au-delà du cas extracteur déjà couvert par IExtractionService.CanBuildExtractor
+    Building Build(Planet planet, BuildingDefinition definition, int x, int y, Inventory inventory); // déduit le coût, démarre le bâtiment en état EnChantier (FR-005/FR-042)
+}
+
+public interface IConstructionSiteService
+{
+    void Tick(Building buildingUnderConstruction, float deltaSimTime); // ProgresChantier n'avance que si un colon a une Affectation de type Construction ciblant ce bâtiment ; transition EnChantier -> Operationnel une fois DureeChantier atteinte (FR-042/FR-043)
 }
 
 public interface IProductionService
@@ -101,16 +106,34 @@ public interface ISkillProgressionService
 
 public interface IAssignmentService
 {
-    void SetAssignmentMode(Colonist colonist, AssignmentMode mode); // FR-035
+    // AssignManually (écrit Colonist.AffectationActuelle, cible un poste, un transport, un chantier
+    // ou une formation) est disponible dès les fondations, réutilisé par US2 (chantier), US3
+    // (chercheur), US4 (transport) avant même que SetAssignmentMode/RunAutomaticAssignmentPass
+    // (FR-035, ci-dessous) n'existent.
     void AssignManually(Colonist colonist, IAssignable target);
+
+    void SetAssignmentMode(Colonist colonist, AssignmentMode mode); // FR-035
     void RunAutomaticAssignmentPass(IEnumerable<Colonist> automaticColonists, IEnumerable<IAssignable> openTargets);
 }
 
 public interface IColonistIdentityService
 {
-    Colonist CreateColonist(EthnicityDefinition colonyEthnicity); // nom + ethnie auto (FR-039/FR-040)
+    Colonist CreateColonist(EthnicityDefinition colonyEthnicity, Gender? gender = null); // nom + ethnie auto (FR-039/FR-040) ; genre tiré ~50/50 si non fourni (FR-045/FR-046), ou imposé par IHousingBirthService avec rééquilibrage de quota pour un nouveau-né (FR-048)
     void Rename(Colonist colonist, string newName);
     void SetBiography(Colonist colonist, string text); // troncature/validation ≤ 300 en amont (FR-041)
+}
+
+public interface IHousingService
+{
+    void AssignResident(Colonist colonist, Building housing); // écrit Colonist.LogementId ; housing doit avoir BuildingDefinition.EstLogement = true
+    void RemoveResident(Colonist colonist);
+}
+
+public interface IHousingBirthService
+{
+    void Tick(Building housing, float deltaSimTime); // fait progresser DureeCohabitationContinue si le logement héberge au moins un homme et une femme, la remet à zéro sinon (FR-047)
+    Gender PickNewbornGender(Colony colony); // aléatoire, rééquilibré vers le genre sous-représenté au-delà de ±10% (FR-048)
+    // Ne lit jamais Treasury ni Inventory : le déclenchement d'une naissance est indépendant des ressources/de la trésorerie (FR-049)
 }
 ```
 
@@ -129,7 +152,7 @@ public interface ITransportService
 ```csharp
 public interface ICivilizationService
 {
-    void Tick(Colony colony, Treasury treasury, float deltaSimTime); // FR-028/FR-029/FR-030
+    void Tick(Colony colony, Treasury treasury, float deltaSimTime); // fait évoluer NiveauDeveloppement uniquement (FR-028/FR-029/FR-030) — ne touche jamais Population, alimentée séparément par IHousingBirthService (FR-049)
     void EvaluateCollapse(Colony colony, Treasury treasury); // FR-036
 }
 ```

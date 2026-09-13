@@ -51,7 +51,9 @@ la version n'est pas supportée, plutôt que d'échouer silencieusement.
 }
 ```
 
-`state` ∈ `Growing | Stagnating | Collapsed` (cf. data-model.md — Colonie.Etat).
+`state` ∈ `Growing | Stagnating | Collapsed` (cf. data-model.md — Colonie.Etat) ; ne concerne que
+`developmentLevel`/`developmentProgress`. La population et le ratio hommes/femmes ne sont pas
+stockés ici : ils se déduisent de la liste `colonists` (FR-028/FR-049).
 
 ## Colonist
 
@@ -59,6 +61,7 @@ la version n'est pas supportée, plutôt que d'échouer silencieusement.
 {
   "id": "guid",
   "name": "Ael Voss",
+  "gender": "Female",
   "ethnicityId": "colony-default",
   "biography": "",
   "health": 0.82,
@@ -67,6 +70,9 @@ la version n'est pas supportée, plutôt que d'échouer silencieusement.
   "currentAssignment": { "type": "Job", "targetId": "guid-posteEmploi" }
 }
 ```
+
+`gender` ∈ `Male | Female` (FR-045) ; `currentAssignment.type` ∈ `Job | Transport | Construction |
+Training` (FR-043 ajoute `Construction`).
 
 `biography` DOIT être ≤ 300 caractères (contrainte déjà appliquée côté saisie UI, FR-041) ;
 `currentAssignment` est absent/`null` si le colon est au chômage.
@@ -78,11 +84,17 @@ la version n'est pas supportée, plutôt que d'échouer silencieusement.
   "id": "guid",
   "definitionId": "extractor-iron",
   "x": 4, "y": 7,
-  "state": "Operational",
+  "state": "UnderConstruction",
+  "constructionProgress": 3.5,
   "isStartingShelter": false,
-  "productionRecipeState": { "inputBuffer": [...], "outputBuffer": [...] }
+  "productionRecipeState": { "inputBuffer": [...], "outputBuffer": [...] },
+  "housingCohabitation": { "continuousDuration": 0.0 }
 }
 ```
+
+`state` ∈ `UnderConstruction | Operational` (FR-042) ; `constructionProgress` est absent/ignoré une
+fois `Operational`. `housingCohabitation` n'est présent que pour un bâtiment dont la définition est
+un logement (`isHousing: true` côté catalogue) et suit `DureeCohabitationContinue` (FR-047).
 
 ## Technology
 
