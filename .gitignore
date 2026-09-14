@@ -68,3 +68,7 @@ Thumbs.db
 
 # === Claude Code ===
 .claude/settings.local.json
+
+# === Test run artifacts ===
+/TestResults*.xml
+/unity-*.log

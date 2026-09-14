@@ -1,0 +1,17 @@
+{
+    "name": "Game.Runtime",
+    "rootNamespace": "Game",
+    "references": [
+        "Unity.Nuget.Newtonsoft-Json",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
