@@ -46,6 +46,16 @@ ré-obscurcissement en Phase 1, non requis par le spec).
 débloquée (FR-009/FR-010) ; `PretPourExtracteur → EnExtraction` quand un extracteur est construit
 dessus ; `EnExtraction → Epuise` quand `QuantiteRestante` atteint 0 (FR-011).
 
+**Extension (contenu) — ressource durable** : un gisement peut être marqué `EstDurable = true`
+(ex: bois), auquel cas `QuantiteRestante` ne décroît jamais et l'état `Epuise` n'est jamais atteint
+— exception à FR-011 portée par le contenu (catalogue de ressources), pas par la règle générale.
+
+**Extension (contenu) — gisement sous case d'eau** : une case d'eau peut porter systématiquement un
+gisement d'une ressource liquide dédiée (ex: eau), extractible uniquement par un type de bâtiment
+marqué `ConstructibleSurEau = true` (pompe) — seule exception à `EstConstructible` (cf. Catalogue de
+bâtiments ci-dessous). Une « nappe phréatique » est le même gisement, situé sur une case terrestre
+normale plutôt que sous l'eau.
+
 ## Technologie (`Game.Research`)
 
 | Champ | Type | Description |
@@ -83,6 +93,13 @@ dessus ; `EnExtraction → Epuise` quand `QuantiteRestante` atteint 0 (FR-011).
 | `RayonBrouillard` | `int` | Rayon de dissipation du brouillard de guerre à la construction (FR-004) |
 | `PostesEmploiDefinis` | `JobDefinition[]` | Postes ouverts par ce type de bâtiment (dont chercheur, université) |
 | `EstLogement` | `bool` | Vrai si ce type de bâtiment est un logement, site du mécanisme de naissance (FR-047) |
+| `ConstructibleSurEau` | `bool` | Vrai uniquement pour une pompe : seule exception autorisée à `Zone.EstConstructible` (extension contenu, cf. Gisement de ressource) |
+| `TauxRecyclage` | `float` | Fraction du `Cout` remboursée au recyclage (ex: 0.5 = 50%) ; valeur d'équilibrage du catalogue, pas fixée par la spec |
+
+**Extension (contenu) — recyclage** : le joueur peut détruire un bâtiment existant (typiquement un
+extracteur/une pompe dont le gisement est épuisé) pour récupérer `Cout × TauxRecyclage` en
+ressources ; la zone redevient libre. Ce principe est fixé ici, le taux exact reste un paramètre de
+contenu.
 
 Ce catalogue est une structure de données extensible et séparée de la spec/du plan (FR-044) : de
 nouveaux `BuildingDefinition` peuvent être ajoutés au fil du développement sans modifier cette

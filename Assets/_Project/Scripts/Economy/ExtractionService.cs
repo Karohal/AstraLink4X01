@@ -12,7 +12,9 @@ namespace Game.Economy
 
         // FR-010/FR-011 : extrait dans le buffer de sortie du site (FR-012, US4) plutôt que dans un
         // stock global directement — la ressource n'atteint le stockage que via un transport assigné.
-        void Tick(Deposit deposit, BuildingInstance extractor, Inventory outputBuffer, float deltaSimTime);
+        // yieldMultiplier : rendement global du bâtiment (0..1+, cf. rendement compétence/santé des
+        // colons assignés) appliqué au taux de base ; 1 = rendement plein par défaut.
+        void Tick(Deposit deposit, BuildingInstance extractor, Inventory outputBuffer, float deltaSimTime, float yieldMultiplier = 1f);
     }
 
     public sealed class ExtractionService : IExtractionService
@@ -31,12 +33,13 @@ namespace Game.Economy
             deposit.StartExtraction();
         }
 
-        public void Tick(Deposit deposit, BuildingInstance extractor, Inventory outputBuffer, float deltaSimTime)
+        public void Tick(Deposit deposit, BuildingInstance extractor, Inventory outputBuffer, float deltaSimTime, float yieldMultiplier = 1f)
         {
             if (deposit == null || extractor == null || !extractor.IsOperational) return;
             if (deposit.State != DepositState.Extracting) return;
+            if (yieldMultiplier <= 0f) return; // aucun travailleur (ou rendement nul) -> aucune extraction
 
-            var amount = Math.Min(ExtractionRatePerSecond * deltaSimTime, deposit.RemainingQuantity);
+            var amount = Math.Min(ExtractionRatePerSecond * yieldMultiplier * deltaSimTime, deposit.RemainingQuantity);
             if (amount <= 0f) return;
 
             deposit.Extract(amount); // FR-011 : Extract() gère l'épuisement

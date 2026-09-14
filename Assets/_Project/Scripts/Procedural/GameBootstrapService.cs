@@ -26,6 +26,10 @@ namespace Game.Procedural
         public int Width = 64;
         public int Height = 64;
         public IReadOnlyList<string> ResourceIds;
+        public IReadOnlyList<string> InfiniteResourceIds; // ressources durables (ex: bois), cf. Deposit.IsInfinite
+        public string WaterResourceId; // si fourni, chaque case d'eau reçoit un gisement de cette ressource
+        public float WaterMinQuantity = 150f;
+        public float WaterMaxQuantity = 500f;
         public EthnicityDefinition StartingEthnicity;
         public int StartingColonistCount = 6;
         public int StartingRevealRadius = 5;
@@ -62,7 +66,8 @@ namespace Game.Procedural
 
         public BootstrapResult Bootstrap(BootstrapConfig config)
         {
-            var planet = _planetGenerationService.Generate(config.Seed, config.Width, config.Height, config.ResourceIds);
+            var planet = _planetGenerationService.Generate(config.Seed, config.Width, config.Height, config.ResourceIds,
+                config.InfiniteResourceIds, config.WaterResourceId, config.WaterMinQuantity, config.WaterMaxQuantity);
 
             var shelterX = config.Width / 2;
             var shelterY = config.Height / 2;

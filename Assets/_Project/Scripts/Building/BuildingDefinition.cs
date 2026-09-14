@@ -23,6 +23,8 @@ namespace Game.Building
         [SerializeField] private int _fogRadius = 5;
         [SerializeField] private string[] _jobIds;
         [SerializeField] private bool _isHousing;
+        [SerializeField] private bool _canBuildOnWater;
+        [SerializeField] private float _recycleRefundRatio = 0.5f;
 
         public string Id => _id;
         public string DisplayName => _displayName;
@@ -33,10 +35,19 @@ namespace Game.Building
         public string[] JobIds => _jobIds ?? Array.Empty<string>();
         public bool IsHousing => _isHousing;
 
+        // Vrai uniquement pour les bâtiments d'extraction liquide (pompe) : autorise le placement
+        // sur une case d'eau, seule exception à la règle générale Zone.EstConstructible.
+        public bool CanBuildOnWater => _canBuildOnWater;
+
+        // Fraction du coût initial remboursée au recyclage (valeur d'équilibrage du catalogue de
+        // contenu, pas de la spec — cf. data-model.md § Recyclage).
+        public float RecycleRefundRatio => _recycleRefundRatio;
+
         // Construction programmatique (tests, imports de contenu) puisque les champs sont privés
         // et normalement renseignés via l'Inspector.
         public void Initialize(string id, string displayName, ResourceAmount[] cost, float constructionDuration,
-            string[] technologyPrerequisiteIds = null, int fogRadius = 5, string[] jobIds = null, bool isHousing = false)
+            string[] technologyPrerequisiteIds = null, int fogRadius = 5, string[] jobIds = null, bool isHousing = false,
+            bool canBuildOnWater = false, float recycleRefundRatio = 0.5f)
         {
             _id = id;
             _displayName = displayName;
@@ -46,6 +57,8 @@ namespace Game.Building
             _fogRadius = fogRadius;
             _jobIds = jobIds;
             _isHousing = isHousing;
+            _canBuildOnWater = canBuildOnWater;
+            _recycleRefundRatio = recycleRefundRatio;
         }
     }
 }

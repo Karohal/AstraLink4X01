@@ -47,6 +47,7 @@ namespace Game.Core
         public string ResourceId;
         public float Remaining;
         public string State;
+        public bool IsInfinite;
     }
 
     [Serializable]

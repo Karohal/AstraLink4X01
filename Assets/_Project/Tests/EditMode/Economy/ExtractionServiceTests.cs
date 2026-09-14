@@ -51,5 +51,53 @@ namespace Game.Tests.EditMode.Economy
             Assert.AreEqual(10f, outputBuffer.GetQuantity("iron"));
             Assert.AreEqual(DepositState.Depleted, deposit.State); // FR-011
         }
+
+        [Test]
+        public void Tick_OnInfiniteDeposit_NeverDepletes()
+        {
+            var deposit = new Deposit("wood", 10f, isInfinite: true); // ressource durable
+            var service = new ExtractionService();
+            service.BeginExtraction(deposit);
+
+            var extractor = new BuildingInstance(Guid.NewGuid(), "extractor-wood", 0, 0, isStartingShelter: true);
+            var outputBuffer = new Inventory();
+
+            service.Tick(deposit, extractor, outputBuffer, deltaSimTime: 10f); // largement au-delà du stock initial
+
+            Assert.AreEqual(10f, deposit.RemainingQuantity); // inchangé
+            Assert.AreEqual(50f, outputBuffer.GetQuantity("wood")); // extraction toujours effective
+            Assert.AreEqual(DepositState.Extracting, deposit.State); // jamais Epuise
+        }
+
+        [Test]
+        public void Tick_ScalesByYieldMultiplier()
+        {
+            var deposit = new Deposit("iron", 1000f);
+            var service = new ExtractionService();
+            service.BeginExtraction(deposit);
+
+            var extractor = new BuildingInstance(Guid.NewGuid(), "extractor-iron", 0, 0, isStartingShelter: true);
+            var outputBuffer = new Inventory();
+
+            service.Tick(deposit, extractor, outputBuffer, deltaSimTime: 1f, yieldMultiplier: 0.2f); // 5 * 0.2 = 1 unité/s
+
+            Assert.AreEqual(1f, outputBuffer.GetQuantity("iron"));
+        }
+
+        [Test]
+        public void Tick_WithZeroYield_ExtractsNothing()
+        {
+            var deposit = new Deposit("iron", 1000f);
+            var service = new ExtractionService();
+            service.BeginExtraction(deposit);
+
+            var extractor = new BuildingInstance(Guid.NewGuid(), "extractor-iron", 0, 0, isStartingShelter: true);
+            var outputBuffer = new Inventory();
+
+            service.Tick(deposit, extractor, outputBuffer, deltaSimTime: 5f, yieldMultiplier: 0f); // aucun travailleur
+
+            Assert.AreEqual(0f, outputBuffer.GetQuantity("iron"));
+            Assert.AreEqual(1000f, deposit.RemainingQuantity);
+        }
     }
 }

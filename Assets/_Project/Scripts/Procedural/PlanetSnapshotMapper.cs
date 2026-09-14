@@ -37,7 +37,8 @@ namespace Game.Procedural
                         {
                             ResourceId = zone.Deposit.ResourceId,
                             Remaining = zone.Deposit.RemainingQuantity,
-                            State = zone.Deposit.State.ToString()
+                            State = zone.Deposit.State.ToString(),
+                            IsInfinite = zone.Deposit.IsInfinite
                         };
                     }
 
@@ -58,7 +59,7 @@ namespace Game.Procedural
                 Deposit deposit = null;
                 if (zoneSnapshot.Deposit != null)
                 {
-                    deposit = new Deposit(zoneSnapshot.Deposit.ResourceId, zoneSnapshot.Deposit.Remaining);
+                    deposit = new Deposit(zoneSnapshot.Deposit.ResourceId, zoneSnapshot.Deposit.Remaining, zoneSnapshot.Deposit.IsInfinite);
                     RestoreDepositState(deposit, zoneSnapshot.Deposit.State);
                 }
 

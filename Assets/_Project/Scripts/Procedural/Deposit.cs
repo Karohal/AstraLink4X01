@@ -19,10 +19,15 @@ namespace Game.Procedural
         public float RemainingQuantity { get; private set; }
         public DepositState State { get; private set; }
 
-        public Deposit(string resourceId, float initialQuantity)
+        // Ressource durable (ex: bois) : le gisement ne s'épuise jamais, par opposition au cas
+        // général (pierre, eau) soumis à FR-011. RemainingQuantity reste informatif dans ce cas.
+        public bool IsInfinite { get; }
+
+        public Deposit(string resourceId, float initialQuantity, bool isInfinite = false)
         {
             ResourceId = resourceId;
             RemainingQuantity = initialQuantity;
+            IsInfinite = isInfinite;
             State = DepositState.TechnologyLocked;
         }
 
@@ -41,6 +46,7 @@ namespace Game.Procedural
         public void Extract(float amount)
         {
             if (State != DepositState.Extracting || amount <= 0f) return;
+            if (IsInfinite) return; // ressource durable : jamais d'épuisement
 
             RemainingQuantity = Math.Max(0f, RemainingQuantity - amount);
             if (RemainingQuantity <= 0f)

@@ -23,6 +23,12 @@ namespace Game.Building
 
         public event Action<string> BuildingPlacementFailed;
         public event Action<BuildingInstance> BuildingPlaced;
+        public event Action PlacementCancelled;
+
+        // Vrai tant qu'un type de bâtiment est sélectionné mais pas encore placé (aucune ressource
+        // dépensée à ce stade) : permet à d'autres systèmes (aperçu de placement, touche Échap...)
+        // de savoir s'il y a une sélection en cours à annuler.
+        public bool IsPlacementActive => _selectedDefinition != null;
 
         private void OnEnable()
         {
@@ -43,7 +49,20 @@ namespace Game.Building
                 menu.Add(button);
             }
 
+            var cancelButton = new Button(CancelPlacement) { text = "Annuler" };
+            menu.Add(cancelButton);
+
             _root.Add(menu);
+        }
+
+        // Annule la sélection de bâtiment en cours avant tout placement (FR-005/FR-006 : le coût
+        // n'est déduit qu'au moment du placement réussi, donc annuler ne fait que désélectionner,
+        // sans rien à rembourser).
+        public void CancelPlacement()
+        {
+            if (_selectedDefinition == null) return;
+            _selectedDefinition = null;
+            PlacementCancelled?.Invoke();
         }
 
         // Appelé par l'orchestrateur de sélection de zone (grille/raycast), hors périmètre de ce

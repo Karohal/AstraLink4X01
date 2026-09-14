@@ -6,6 +6,7 @@ namespace Game.Colonists
     public sealed class JobDefinition : ScriptableObject
     {
         public const string ResearcherJobId = "researcher";
+        public const string ExtractionWorkerJobId = "extraction-worker";
 
         [SerializeField] private string _id;
         [SerializeField] private string _displayName;
