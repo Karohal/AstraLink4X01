@@ -15,5 +15,15 @@ namespace Game.Colonists
         public string[] MaleFirstNames => _maleFirstNames ?? Array.Empty<string>();
         public string[] FemaleFirstNames => _femaleFirstNames ?? Array.Empty<string>();
         public string[] LastNames => _lastNames ?? Array.Empty<string>();
+
+        // Construction programmatique (tests, imports de contenu) puisque les champs sont privés
+        // et normalement renseignés via l'Inspector.
+        public void Initialize(string id, string[] maleFirstNames, string[] femaleFirstNames, string[] lastNames)
+        {
+            _id = id;
+            _maleFirstNames = maleFirstNames;
+            _femaleFirstNames = femaleFirstNames;
+            _lastNames = lastNames;
+        }
     }
 }

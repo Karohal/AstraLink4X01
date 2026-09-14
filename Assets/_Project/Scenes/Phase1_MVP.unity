@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &57018167
+--- !u!1 &1821993898
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,9 +127,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 57018170}
-  - component: {fileID: 57018169}
-  - component: {fileID: 57018168}
+  - component: {fileID: 1821993901}
+  - component: {fileID: 1821993900}
+  - component: {fileID: 1821993899}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -137,21 +137,21 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!81 &57018168
+--- !u!81 &1821993899
 AudioListener:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 57018167}
+  m_GameObject: {fileID: 1821993898}
   m_Enabled: 1
---- !u!20 &57018169
+--- !u!20 &1821993900
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 57018167}
+  m_GameObject: {fileID: 1821993898}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 1
@@ -196,13 +196,13 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!4 &57018170
+--- !u!4 &1821993901
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 57018167}
+  m_GameObject: {fileID: 1821993898}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -211,7 +211,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &385094715
+--- !u!1 &1894345178
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -219,8 +219,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 385094717}
-  - component: {fileID: 385094716}
+  - component: {fileID: 1894345180}
+  - component: {fileID: 1894345179}
   m_Layer: 0
   m_Name: Phase1TestHarness
   m_TagString: Untagged
@@ -228,13 +228,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &385094716
+--- !u!114 &1894345179
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 385094715}
+  m_GameObject: {fileID: 1894345178}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f230cb01dd5334746ad63613fea77f22, type: 3}
@@ -254,19 +254,21 @@ MonoBehaviour:
   _waterTechnologyDefinition: {fileID: 11400000, guid: 65e45f9bb45624b408b0d9cdb63999e8, type: 2}
   _researcherJobDefinition: {fileID: 11400000, guid: faa37d4929387ad49809f89f6e9280c9, type: 2}
   _startingEthnicity: {fileID: 11400000, guid: 9af5bde20ea4e2f408edb49a7859c4b8, type: 2}
+  _colonistTransporterDefinition: {fileID: 11400000, guid: 07862f2e3ba2dc245a44914af94aa38c, type: 2}
+  _terrainSpeedCatalog: {fileID: 11400000, guid: 91151ac743bbcd34698ee418d22c1f36, type: 2}
   _seed: 12345
   _width: 20
   _height: 20
   _startingRevealRadius: 4
   _startingMaterials: 500
-  _transportCapacityPerCycle: 3
---- !u!4 &385094717
+  _fallbackTransportCapacityPerCycle: 3
+--- !u!4 &1894345180
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 385094715}
+  m_GameObject: {fileID: 1894345178}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -279,5 +281,5 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 57018170}
-  - {fileID: 385094717}
+  - {fileID: 1821993901}
+  - {fileID: 1894345180}

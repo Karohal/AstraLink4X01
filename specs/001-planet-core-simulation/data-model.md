@@ -73,6 +73,7 @@ normale plutôt que sous l'eau.
 | `Id` | référence `RessourceDefinition` (ScriptableObject) | Catalogue (brute ou transformée) |
 | `EstBrute` | `bool` | Distingue ressource brute vs. transformée |
 | `RecetteTransformation` | `Recette?` | Entrées/sorties si ressource issue d'une chaîne de production |
+| `Densite` | `float` (kg/m³) | Densité réelle de la ressource (ex: eau 1000, bois 650, pierre 2600, fer 7870) ; propriété de contenu par ressource, pas une liste fixe — sert à la double limite de capacité de transport (masse ET volume) |
 
 ## Stock / Inventaire (`Game.Economy`)
 
@@ -182,12 +183,37 @@ ne régresse pas en Phase 1 (non requis par le spec).
 | Champ | Type | Description |
 |---|---|---|
 | `BatimentId` | référence `Batiment` (logement, `EstLogement = true`) | Logement concerné |
-| `DureeCohabitationContinue` | `float` | Temps continu écoulé depuis qu'au moins un `Colon` de genre `Homme` et un de genre `Femme` ont `LogementId` pointant vers ce bâtiment ; remis à zéro dès que cette condition n'est plus vraie (FR-047) |
+| `DureeCohabitationContinue` | `float` | Temps continu écoulé depuis que le logement est occupé par un couple (un `Colon` `Homme` et un `Colon` `Femme`, tous deux adultes) ; remis à zéro dès que cette condition n'est plus vraie (FR-047) |
+| `TempsDepuisDerniereTentative` | `float` | Temps écoulé depuis la dernière tentative de naissance (une fois `DureeCohabitationContinue` ≥ un an) |
 
-**Transitions** : une naissance est déclenchée quand `DureeCohabitationContinue` atteint un an de
-temps de jeu (FR-047) ; le nouveau colon créé via `IColonistIdentityService.CreateColonist` hérite
-de l'ethnie de la `Colonie` (FR-040) et reçoit un genre tiré aléatoirement avec rééquilibrage de
-quota (FR-048), indépendamment de l'état des ressources/de la trésorerie de la colonie (FR-049).
+**Assignation automatique, pas manuelle** (`IHousingService.TryFormCouple`, extension contenu) : dès
+qu'un logement n'a aucun adulte, les deux premiers colons adultes disponibles (`LogementId` nul,
+non-enfants) de sexe opposé y sont assignés simultanément pour former un couple — aucune sélection
+par le joueur. Exclusivité : un logement occupé par un couple n'accueille jamais de 3ᵉ adulte (le
+modèle ne connaît que 0 ou 2 adultes par logement, jamais 1 seul).
+
+**Capacité et taux de natalité** (`BuildingDefinition`, valeurs d'équilibrage) : `CapaciteAdultes`
+(2, fixe dans ce modèle), `CapaciteEnfants`, `IntervalleTentativeNaissance`,
+`ProbabiliteSuccesTentative` — le premier type de logement (« Abri basique ») a un taux de succès
+plus faible que les futurs types (« Maison »...), à capacité/confort croissants.
+
+**Transitions** : une fois `DureeCohabitationContinue` ≥ un an de temps de jeu ET une place
+d'enfant libre, des **tentatives de naissance répétées** ont lieu (toutes les
+`IntervalleTentativeNaissance`, avec probabilité `ProbabiliteSuccesTentative` de succès chacune) —
+un échec n'est pas définitif, la tentative suivante a lieu plus tard (FR-047), ce qui disperse
+naturellement les naissances dans le temps plutôt que de les concentrer à l'année pile. Le nouveau
+colon créé via `IColonistIdentityService.CreateColonist` hérite de l'ethnie de la `Colonie`
+(FR-040), reçoit un genre tiré aléatoirement avec rééquilibrage de quota (FR-048), naît `Enfant`
+dans ce logement, et est indépendant de l'état des ressources/de la trésorerie de la colonie
+(FR-049). Un enfant grandit (temps de jeu cumulé) jusqu'à sa majorité (18 ans), puis quitte
+automatiquement le logement (`LogementId` réinitialisé) et devient un colon adulte disponible, avec
+un niveau de compétence initial de 25% (cohérent avec le plafond d'un colon sans éducation
+formelle) pour les métiers déjà pratiqués par les colons de départ.
+
+**Important** : l'abri de secours initial (`EstAbriInitial = true`) n'est PAS un logement au sens de
+ce système (`EstLogement = false`) — les colons de départ y vivent sans `LogementId` défini, et
+aucune naissance n'y est possible ; il faut construire un premier logement dédié (Abri basique) pour
+qu'un couple puisse se former et qu'une naissance devienne possible.
 
 ## Tâche de transport (`Game.Logistics`)
 
@@ -195,10 +221,52 @@ quota (FR-048), indépendamment de l'état des ressources/de la trésorerie de l
 |---|---|---|
 | `Id` | `Guid` | Identifiant |
 | `RessourceId` | référence `RessourceDefinition` | Ressource transportée |
-| `SiteSourceId` | référence `Batiment` | Origine (extracteur, bâtiment de production) |
-| `SiteDestinationId` | référence `Batiment` | Destination (stockage, bâtiment consommateur) |
+| `SiteSourceId` | référence `Batiment` | Origine (extracteur, bâtiment de production) — **doit être un bâtiment réellement ciblé par le joueur**, jamais une valeur par défaut |
+| `SiteDestinationId` | référence `Batiment` | Destination (entrepôt/citerne) — idem, le bâtiment de stockage effectivement construit et ciblé |
 | `AssigneA` | `ColonId?` \| `VehiculeId?` | Colon ou véhicule assigné (FR-013) |
-| `CapaciteParCycle` | `float` | Volume transportable par unité de temps |
+| `Phase` | `CyclePhase` (enum) | `TrajetVersSource → Chargement → TrajetVersDestination → Dechargement`, puis reprise automatique (cf. Cycle de transport ci-dessous) |
+| `ProgresPhase` | `float` | Temps écoulé (s) dans la phase actuelle |
+| `QuantiteTransportee` | `float` | Charge actuellement portée par le transporteur (0 hors phases de trajet/déchargement) |
+
+## Cycle de transport (`Game.Logistics`)
+
+Chaque transporteur (colon, puis véhicule) suit un cycle à quatre phases, sans mouvement continu :
+
+1. **Trajet vers la source** : durée = distance(dépôt, source) / (vitesse du transporteur ×
+   modificateur de terrain moyen du trajet, cf. Vitesse de terrain ci-dessous).
+2. **Chargement** : durée fixe (valeur d'équilibrage de départ, ex. 5 s — amenée à diminuer avec
+   des améliorations de bâtiments/technologies) ; le transporteur patiente à la source sans
+   commencer ce décompte tant qu'aucun stock n'est disponible (pas d'aller-retour à vide). Au
+   terme du chargement, `min(CapaciteMasseKg, CapaciteVolumeM3 × Densite)` quitte le site source.
+3. **Trajet retour vers la destination** : même distance/terrain que le trajet aller (calcul
+   symétrique), donc même durée.
+4. **Déchargement** : durée fixe (même principe que le chargement) ; la charge rejoint le stock du
+   bâtiment de destination.
+
+Le cycle reprend alors automatiquement à l'étape 1, sans intervention du joueur.
+
+## Transporteur — `TransporteurDefinition` (ScriptableObject, `Game.Logistics`)
+
+Catalogue extensible (FR-044) : le colon (transporteur de base) est une première entrée ; les
+futurs véhicules (camions...) suivront le même principe.
+
+| Champ | Type | Description |
+|---|---|---|
+| `Id` | identifiant de catalogue | ex: `colonist`, futur `truck-basic`... |
+| `CapaciteMasseKg` | `float` | Plafond de masse transportable (colon : 12 kg) |
+| `CapaciteVolumeM3` | `float` | Plafond de volume transportable (colon : 0.012 m³, soit 12 L) |
+
+**Règle de capacité** : la charge prise en une fois lors du chargement (cf. Cycle de transport
+ci-dessous) pour une ressource donnée est `min(CapaciteMasseKg, CapaciteVolumeM3 × Densite)` — le
+premier des deux plafonds atteint limite, jamais l'un des deux seul
+(`Game.Logistics.TransportCapacityCalculator`).
+
+## Vitesse de terrain — `TerrainSpeedCatalog` (ScriptableObject, `Game.Procedural`)
+
+Catalogue de contenu (FR-044) associant à chaque `TerrainType` un modificateur de vitesse de
+transport (principe fixé ici ; valeurs par terrain laissées à l'équilibrage). La vitesse moyenne
+d'un trajet source → destination est la moyenne des modificateurs des cases traversées
+(`Game.Procedural.TerrainRouting`, approximation en ligne droite — aucun pathfinding en Phase 1).
 
 **Transitions** : la ressource ne quitte le site source que si une tâche de transport avec
 capacité suffisante est active (FR-012/FR-014) ; sans tâche assignée, la ressource s'accumule sur

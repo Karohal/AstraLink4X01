@@ -30,6 +30,11 @@ namespace Game.Building
         public float ConstructionProgress { get; private set; }
         public TransformationState TransformationState { get; set; } = TransformationState.Operational;
 
+        // Nom choisi par le joueur (fiche du bâtiment) ; null/vide tant qu'il n'a pas été renommé,
+        // auquel cas l'affichage retombe sur BuildingDefinition.DisplayName (partagé par tous les
+        // bâtiments du même type).
+        public string CustomName { get; private set; }
+
         public BuildingInstance(Guid id, string definitionId, int x, int y, bool isStartingShelter = false)
         {
             Id = id;
@@ -62,6 +67,11 @@ namespace Game.Building
         {
             State = state;
             ConstructionProgress = constructionProgress;
+        }
+
+        public void Rename(string newName)
+        {
+            CustomName = newName;
         }
     }
 }

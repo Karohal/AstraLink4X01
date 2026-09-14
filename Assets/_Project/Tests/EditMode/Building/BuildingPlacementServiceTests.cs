@@ -84,6 +84,22 @@ namespace Game.Tests.EditMode.Building
         }
 
         [Test]
+        public void CanBuild_OnAlreadyOccupiedZone_ReturnsFalse()
+        {
+            var planet = CreateRevealedPlanet();
+            var definition = CreateDefinition(0f);
+            var inventory = new Inventory();
+
+            var service = new BuildingPlacementService();
+            service.Build(planet, definition, 2, 2, inventory);
+
+            var canBuildAgain = service.CanBuild(planet, definition, 2, 2, inventory, out var missing);
+
+            Assert.IsFalse(canBuildAgain); // une zone occupée ne peut pas recevoir un second bâtiment
+            CollectionAssert.Contains(missing, "zone-occupied");
+        }
+
+        [Test]
         public void Recycle_RefundsPartialCost_AndFreesZone()
         {
             var planet = CreateRevealedPlanet();

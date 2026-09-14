@@ -49,13 +49,21 @@ namespace Game.Core
         [SerializeField] private JobDefinition _researcherJobDefinition;
         [SerializeField] private EthnicityDefinition _startingEthnicity;
 
+        [Header("Contenu — transport (US4 peaufinage)")]
+        [SerializeField] private TransporterDefinition _colonistTransporterDefinition;
+        [SerializeField] private TerrainSpeedCatalog _terrainSpeedCatalog;
+
         [Header("Génération de planète (réduite pour un test manuel lisible)")]
         [SerializeField] private int _seed = 12345;
         [SerializeField] private int _width = 20;
         [SerializeField] private int _height = 20;
         [SerializeField] private int _startingRevealRadius = 4;
         [SerializeField] private float _startingMaterials = 500f;
-        [SerializeField] private float _transportCapacityPerCycle = 3f;
+
+        // Temps de chargement/déchargement du cycle de transport (US4 peaufinage pt.2) : valeurs
+        // d'équilibrage de départ, amenées à diminuer avec des améliorations de bâtiments/technologies.
+        [SerializeField] private float _loadingDurationSeconds = 5f;
+        [SerializeField] private float _unloadingDurationSeconds = 5f;
 
         private IPlanetGenerationService _planetGenerationService;
         private IFogOfWarService _fogOfWarService;
@@ -79,12 +87,14 @@ namespace Game.Core
         private readonly Dictionary<Guid, Inventory> _extractorOutputBuffers = new Dictionary<Guid, Inventory>();
         private readonly List<Colonist> _colonists = new List<Colonist>();
         private readonly List<TransportTask> _transportTasks = new List<TransportTask>();
-        private Inventory _warehouse; // stockage des ressources solides (bois, pierre, matériaux)
-        private Inventory _cistern; // stockage de l'eau
+        private Inventory _warehouse; // trésor de matériaux de construction (FR-005/FR-006), pas un site de stockage
+        private readonly Dictionary<Guid, Inventory> _storageInventoriesByBuildingId = new Dictionary<Guid, Inventory>(); // un Inventory par entrepôt/citerne réellement construit(e)
+        private Guid? _selectedDestinationBuildingId; // entrepôt/citerne ciblé(e) pour le prochain transport assigné
 
         private Dictionary<string, TechnologyDefinition> _technologyDefinitionsByResourceId;
         private Dictionary<string, Technology> _technologiesByResourceId;
         private Dictionary<string, string> _resourceDisplayNamesById;
+        private Dictionary<string, ResourceDefinition> _resourceDefinitionsById;
         private string _selectedResearchResourceId;
         private JobSlot _researcherSlot;
         private readonly Dictionary<Guid, JobSlot> _operatorSlotsByBuildingId = new Dictionary<Guid, JobSlot>();
@@ -165,7 +175,9 @@ namespace Game.Core
             TechnologyDefinition stoneTechnologyDefinition,
             TechnologyDefinition waterTechnologyDefinition,
             JobDefinition researcherJobDefinition,
-            EthnicityDefinition startingEthnicity)
+            EthnicityDefinition startingEthnicity,
+            TransporterDefinition colonistTransporterDefinition,
+            TerrainSpeedCatalog terrainSpeedCatalog)
         {
             _shelterDefinition = shelterDefinition;
             _storageDefinition = storageDefinition;
@@ -181,6 +193,8 @@ namespace Game.Core
             _waterTechnologyDefinition = waterTechnologyDefinition;
             _researcherJobDefinition = researcherJobDefinition;
             _startingEthnicity = startingEthnicity;
+            _colonistTransporterDefinition = colonistTransporterDefinition;
+            _terrainSpeedCatalog = terrainSpeedCatalog;
         }
 
         private bool HasRequiredContent()
@@ -189,7 +203,8 @@ namespace Game.Core
                    _extractorDefinition != null && _pumpDefinition != null &&
                    _materialsResource != null && _woodResource != null && _stoneResource != null && _waterResource != null &&
                    _woodTechnologyDefinition != null && _stoneTechnologyDefinition != null && _waterTechnologyDefinition != null &&
-                   _researcherJobDefinition != null && _startingEthnicity != null;
+                   _researcherJobDefinition != null && _startingEthnicity != null &&
+                   _colonistTransporterDefinition != null && _terrainSpeedCatalog != null;
         }
 
         private void NewGame()
@@ -217,6 +232,14 @@ namespace Game.Core
                 [_waterResource.Id] = _waterResource.DisplayName
             };
 
+            _resourceDefinitionsById = new Dictionary<string, ResourceDefinition>
+            {
+                [_materialsResource.Id] = _materialsResource,
+                [_woodResource.Id] = _woodResource,
+                [_stoneResource.Id] = _stoneResource,
+                [_waterResource.Id] = _waterResource
+            };
+
             _baseResourceIds = new HashSet<string> { _woodResource.Id, _stoneResource.Id, _waterResource.Id };
 
             var config = new BootstrapConfig
@@ -231,7 +254,7 @@ namespace Game.Core
                 StartingColonistCount = 6,
                 StartingRevealRadius = _startingRevealRadius,
                 ShelterDefinitionId = _shelterDefinition.Id,
-                StartingJobIdsToRandomize = new[] { _researcherJobDefinition.Id, JobDefinition.ExtractionWorkerJobId }
+                StartingJobIdsToRandomize = new[] { _researcherJobDefinition.Id, JobDefinition.MinerJobId }
             };
 
             var result = _bootstrapService.Bootstrap(config);
@@ -249,10 +272,11 @@ namespace Game.Core
             _extractorOutputBuffers.Clear();
             _transportTasks.Clear();
             _operatorSlotsByBuildingId.Clear();
+            _storageInventoriesByBuildingId.Clear();
+            _selectedDestinationBuildingId = null;
 
             _warehouse = new Inventory();
             _warehouse.SetQuantity(_materialsResource.Id, _startingMaterials);
-            _cistern = new Inventory();
 
             _technologiesByResourceId = new Dictionary<string, Technology>
             {
@@ -302,7 +326,7 @@ namespace Game.Core
                 }
 
                 var workers = GetAssignedWorkers(building.Id);
-                var buildingYield = ExtractorYield.ComputeBuildingYield(workers, JobDefinition.ExtractionWorkerJobId);
+                var buildingYield = ExtractorYield.ComputeBuildingYield(workers, JobDefinition.MinerJobId);
 
                 _extractionService.Tick(zone.Deposit, building, buffer, deltaSimTime, buildingYield);
             }
@@ -313,8 +337,10 @@ namespace Game.Core
             foreach (var task in _transportTasks)
             {
                 if (!_extractorOutputBuffers.TryGetValue(task.SourceBuildingId, out var source)) continue;
-                var destination = task.ResourceId == _waterResource.Id ? _cistern : _warehouse;
-                _transportService.Tick(task, source, destination, deltaSimTime);
+                if (!_storageInventoriesByBuildingId.TryGetValue(task.DestinationBuildingId, out var destination)) continue;
+                if (!TryBuildTransportCycleConfig(task, out var config)) continue;
+
+                _transportService.Tick(task, source, destination, config, deltaSimTime);
             }
         }
 
@@ -379,6 +405,9 @@ namespace Game.Core
             if (isExtractorLike)
                 _extractorOutputBuffers[building.Id] = new Inventory();
 
+            if (_selectedBuildToPlace == _storageDefinition || _selectedBuildToPlace == _cisternDefinition)
+                _storageInventoriesByBuildingId[building.Id] = new Inventory();
+
             _lastMessage = $"{_selectedBuildToPlace.DisplayName} en chantier à ({x},{y}). Assignez un colon pour démarrer le chantier.";
         }
 
@@ -415,7 +444,7 @@ namespace Game.Core
 
             if (!_operatorSlotsByBuildingId.TryGetValue(building.Id, out var slot))
             {
-                slot = new JobSlot(Guid.NewGuid(), JobDefinition.ExtractionWorkerJobId, building.Id);
+                slot = new JobSlot(Guid.NewGuid(), JobDefinition.MinerJobId, building.Id);
                 _operatorSlotsByBuildingId[building.Id] = slot;
             }
 
@@ -455,10 +484,28 @@ namespace Game.Core
                 return;
             }
 
-            var task = _transportTasks.FirstOrDefault(t => t.SourceBuildingId == building.Id);
+            // Corrige un bug où toute tâche de transport était systématiquement liée à l'abri de
+            // secours, indépendamment de l'entrepôt/citerne réellement construit(e) et ciblé(e) par
+            // le joueur (bouton « Cibler comme destination » sur le bâtiment de stockage voulu).
+            if (!_selectedDestinationBuildingId.HasValue ||
+                !TryGetStorageBuilding(_selectedDestinationBuildingId.Value, out var destinationBuilding, out var destinationDef))
+            {
+                _lastMessage = "Sélectionnez d'abord une destination : bouton « Cibler comme destination » sur un entrepôt/une citerne construit(e) et opérationnel(le).";
+                return;
+            }
+
+            var isWaterResource = zone.Deposit.ResourceId == _waterResource.Id;
+            var destinationAcceptsResource = isWaterResource ? destinationDef == _cisternDefinition : destinationDef == _storageDefinition;
+            if (!destinationAcceptsResource)
+            {
+                _lastMessage = $"{destinationDef.DisplayName} ne peut pas recevoir « {ResourceDisplayName(zone.Deposit.ResourceId)} ».";
+                return;
+            }
+
+            var task = _transportTasks.FirstOrDefault(t => t.SourceBuildingId == building.Id && t.DestinationBuildingId == destinationBuilding.Id);
             if (task == null)
             {
-                task = _transportService.Assign(building.Id, _shelter.Id, zone.Deposit.ResourceId, _transportCapacityPerCycle, colonist.Id, null);
+                task = _transportService.Assign(building.Id, destinationBuilding.Id, zone.Deposit.ResourceId, colonist.Id, null);
                 _transportTasks.Add(task);
             }
             else
@@ -467,8 +514,45 @@ namespace Game.Core
             }
 
             _assignmentService.AssignManually(colonist, new AssignableTarget(task.Id, AssignmentType.Transport));
-            var destinationLabel = zone.Deposit.ResourceId == _waterResource.Id ? "la citerne" : "l'entrepôt";
-            _lastMessage = $"{colonist.Name} assigné au transport vers {destinationLabel}.";
+            _lastMessage = $"{colonist.Name} assigné au transport vers {destinationDef.DisplayName} ({destinationBuilding.X},{destinationBuilding.Y}).";
+        }
+
+        private bool TryGetStorageBuilding(Guid buildingId, out BuildingInstance building, out BuildingDefinition definition)
+        {
+            building = _buildings.FirstOrDefault(b => b.Id == buildingId);
+            definition = null;
+            if (building == null || building.State != BuildingState.Operational) { building = null; return false; }
+            if (!_definitionsById.TryGetValue(buildingId, out definition)) return false;
+            if (definition != _storageDefinition && definition != _cisternDefinition) { definition = null; return false; }
+            return true;
+        }
+
+        // Assemble la configuration du cycle de transport (trajets dépendants de la distance et du
+        // terrain moyen traversé, chargement/déchargement fixes, charge maximale masse/volume) pour
+        // le trajet source -> destination réel de cette tâche.
+        private bool TryBuildTransportCycleConfig(TransportTask task, out TransportCycleConfig config)
+        {
+            config = default;
+            var sourceBuilding = _buildings.FirstOrDefault(b => b.Id == task.SourceBuildingId);
+            var destinationBuilding = _buildings.FirstOrDefault(b => b.Id == task.DestinationBuildingId);
+            if (sourceBuilding == null || destinationBuilding == null) return false;
+
+            config = BuildTransportCycleConfig(task.ResourceId, sourceBuilding.X, sourceBuilding.Y, destinationBuilding.X, destinationBuilding.Y);
+            return true;
+        }
+
+        private TransportCycleConfig BuildTransportCycleConfig(string resourceId, int sourceX, int sourceY, int destinationX, int destinationY)
+        {
+            _resourceDefinitionsById.TryGetValue(resourceId, out var resourceDefinition);
+            var maxLoadKg = TransportCapacityCalculator.ComputeMaxLoadKg(resourceDefinition, _colonistTransporterDefinition);
+
+            var distanceTiles = TravelTimeCalculator.ComputeDistanceTiles(sourceX, sourceY, destinationX, destinationY);
+            var speedModifier = TerrainRouting.ComputeAverageSpeedModifier(_planet, sourceX, sourceY, destinationX, destinationY, _terrainSpeedCatalog);
+            var travelDuration = TravelTimeCalculator.ComputeTravelDuration(distanceTiles, _colonistTransporterDefinition.SpeedTilesPerSecond, speedModifier);
+
+            // Même distance/terrain à l'aller (dépôt -> source) et au retour (source -> dépôt) : une
+            // seule durée de trajet calculée, réutilisée pour les deux jambes du cycle.
+            return new TransportCycleConfig(travelDuration, _loadingDurationSeconds, travelDuration, _unloadingDurationSeconds, maxLoadKg);
         }
 
         private void Unassign(Colonist colonist)
@@ -544,8 +628,12 @@ namespace Game.Core
             _buildings.Remove(building);
             _definitionsById.Remove(building.Id);
             _extractorOutputBuffers.Remove(building.Id);
+            _storageInventoriesByBuildingId.Remove(building.Id);
+            if (_selectedDestinationBuildingId == building.Id) _selectedDestinationBuildingId = null;
 
-            var staleTaskIds = _transportTasks.Where(t => t.SourceBuildingId == building.Id).Select(t => t.Id).ToList();
+            var staleTaskIds = _transportTasks
+                .Where(t => t.SourceBuildingId == building.Id || t.DestinationBuildingId == building.Id)
+                .Select(t => t.Id).ToList();
             _transportTasks.RemoveAll(t => staleTaskIds.Contains(t.Id));
 
             _operatorSlotsByBuildingId.TryGetValue(building.Id, out var staleOperatorSlot);
@@ -614,6 +702,8 @@ namespace Game.Core
             _buildings.Clear();
             _definitionsById.Clear();
             _extractorOutputBuffers.Clear();
+            _storageInventoriesByBuildingId.Clear();
+            _selectedDestinationBuildingId = null;
             foreach (var buildingSnapshot in snapshot.Buildings)
             {
                 var building = BuildingSnapshotMapper.FromSnapshot(buildingSnapshot);
@@ -622,6 +712,7 @@ namespace Game.Core
                 var definition = ResolveDefinition(buildingSnapshot.DefinitionId);
                 if (definition != null) _definitionsById[building.Id] = definition;
                 if (definition == _extractorDefinition || definition == _pumpDefinition) _extractorOutputBuffers[building.Id] = new Inventory();
+                if (definition == _storageDefinition || definition == _cisternDefinition) _storageInventoriesByBuildingId[building.Id] = new Inventory();
                 if (building.IsStartingShelter) _shelter = building;
             }
 
@@ -635,12 +726,21 @@ namespace Game.Core
 
             _transportTasks.Clear();
             foreach (var taskSnapshot in snapshot.TransportTasks)
-                _transportTasks.Add(TransportTaskSnapshotMapper.FromSnapshot(taskSnapshot, _transportCapacityPerCycle));
+            {
+                // Une tâche dont la source ou la destination n'existe plus (bâtiment recyclé entre
+                // la sauvegarde et le chargement, par ex.) n'a plus de sens : elle est abandonnée
+                // plutôt que rejouée avec une configuration de repli arbitraire.
+                var sourceExists = _buildings.Any(b => b.Id == taskSnapshot.SourceBuildingId);
+                var destinationExists = _buildings.Any(b => b.Id == taskSnapshot.DestinationBuildingId);
+                if (!sourceExists || !destinationExists) continue;
+
+                _transportTasks.Add(TransportTaskSnapshotMapper.FromSnapshot(taskSnapshot));
+            }
 
             _researcherSlot = new JobSlot(Guid.NewGuid(), _researcherJobDefinition.Id, _shelter.Id);
 
             _selectedX = _selectedY = -1;
-            _lastMessage = "Partie chargée (colons et entrepôt/citerne conservés en mémoire, non couverts par le schéma actuel — cf. US6/T051).";
+            _lastMessage = "Partie chargée (colons et contenu des entrepôts/citernes/trésor conservés en mémoire, non couverts par le schéma actuel — cf. US6/T051).";
         }
 
         private BuildingDefinition ResolveDefinition(string definitionId)
@@ -693,11 +793,15 @@ namespace Game.Core
             GUILayout.EndHorizontal();
 
             GUILayout.Space(10);
-            GUILayout.Label("Entrepôt (solide)");
+            GUILayout.Label("Trésor de matériaux (construction)");
             foreach (var kvp in _warehouse.Quantities)
                 GUILayout.Label($"  {ResourceDisplayName(kvp.Key)} : {kvp.Value:0.0}");
-            GUILayout.Label("Citerne (eau)");
-            foreach (var kvp in _cistern.Quantities)
+
+            GUILayout.Label("Entrepôts construits (solide, total)");
+            foreach (var kvp in AggregateStorageQuantities(_storageDefinition))
+                GUILayout.Label($"  {ResourceDisplayName(kvp.Key)} : {kvp.Value:0.0}");
+            GUILayout.Label("Citernes construites (eau, total)");
+            foreach (var kvp in AggregateStorageQuantities(_cisternDefinition))
                 GUILayout.Label($"  {ResourceDisplayName(kvp.Key)} : {kvp.Value:0.0}");
 
             GUILayout.Space(10);
@@ -747,12 +851,31 @@ namespace Game.Core
                         if (def == _extractorDefinition || def == _pumpDefinition)
                         {
                             var workers = GetAssignedWorkers(building.Id);
-                            var buildingYield = ExtractorYield.ComputeBuildingYield(workers, JobDefinition.ExtractionWorkerJobId);
+                            var buildingYield = ExtractorYield.ComputeBuildingYield(workers, JobDefinition.MinerJobId);
                             GUILayout.Label($"    Effectif: {workers.Count}/{ExtractorYield.MaxWorkerSlots} — rendement: {buildingYield:P0}");
                             if (_extractorOutputBuffers.TryGetValue(building.Id, out var buffer))
                             {
                                 foreach (var kvp in buffer.Quantities)
                                     GUILayout.Label($"    buffer: {ResourceDisplayName(kvp.Key)} = {kvp.Value:0.0}");
+                            }
+
+                            DrawTransportStatus(building);
+                        }
+
+                        if (def == _storageDefinition || def == _cisternDefinition)
+                        {
+                            if (_storageInventoriesByBuildingId.TryGetValue(building.Id, out var storageInventory))
+                            {
+                                GUILayout.Label("    Contenu :");
+                                foreach (var kvp in storageInventory.Quantities)
+                                    GUILayout.Label($"      {ResourceDisplayName(kvp.Key)} : {kvp.Value:0.0}");
+                            }
+
+                            if (building.State == BuildingState.Operational)
+                            {
+                                var isCurrentDestination = _selectedDestinationBuildingId == building.Id;
+                                if (GUILayout.Button(isCurrentDestination ? "Destination ciblée ✓" : "Cibler comme destination"))
+                                    _selectedDestinationBuildingId = building.Id;
                             }
                         }
 
@@ -787,6 +910,71 @@ namespace Game.Core
             if (GUILayout.Button("Charger")) LoadGame();
             if (GUILayout.Button("Nouvelle partie")) NewGame();
             GUILayout.EndHorizontal();
+        }
+
+        // Affiche le cycle de transport en cours pour ce bâtiment source (extracteur/pompe), le cas
+        // échéant : phase actuelle (trajet aller/chargement/trajet retour/déchargement), progression
+        // dans la phase, et destination réellement ciblée (corrige le bug où le transport semblait
+        // toujours aboutir au même endroit indépendamment du bâtiment construit).
+        private void DrawTransportStatus(BuildingInstance sourceBuilding)
+        {
+            var task = _transportTasks.FirstOrDefault(t => t.SourceBuildingId == sourceBuilding.Id);
+            if (task == null)
+            {
+                GUILayout.Label("    Transport: aucune tâche (ciblez une destination puis assignez un colon).");
+                return;
+            }
+
+            var destinationLabel = "destination introuvable";
+            if (_definitionsById.TryGetValue(task.DestinationBuildingId, out var destinationDef))
+            {
+                var destinationBuilding = _buildings.FirstOrDefault(b => b.Id == task.DestinationBuildingId);
+                destinationLabel = destinationBuilding != null
+                    ? $"{destinationDef.DisplayName} ({destinationBuilding.X},{destinationBuilding.Y})"
+                    : destinationDef.DisplayName;
+            }
+
+            var phaseDuration = TryBuildTransportCycleConfig(task, out var config) ? GetConfiguredPhaseDuration(task.Phase, config) : 0f;
+            GUILayout.Label($"    Transport -> {destinationLabel} : {DescribePhase(task.Phase)} ({task.PhaseProgress:0.0}/{phaseDuration:0.0}s), charge {task.CarriedQuantity:0.0} kg");
+        }
+
+        private static float GetConfiguredPhaseDuration(TransportCyclePhase phase, TransportCycleConfig config)
+        {
+            return phase switch
+            {
+                TransportCyclePhase.TravelingToSource => config.TravelToSourceDuration,
+                TransportCyclePhase.Loading => config.LoadingDuration,
+                TransportCyclePhase.TravelingToDestination => config.TravelToDestinationDuration,
+                TransportCyclePhase.Unloading => config.UnloadingDuration,
+                _ => 0f
+            };
+        }
+
+        private static string DescribePhase(TransportCyclePhase phase)
+        {
+            return phase switch
+            {
+                TransportCyclePhase.TravelingToSource => "trajet vers l'extracteur/la pompe",
+                TransportCyclePhase.Loading => "chargement",
+                TransportCyclePhase.TravelingToDestination => "trajet retour",
+                TransportCyclePhase.Unloading => "déchargement",
+                _ => phase.ToString()
+            };
+        }
+
+        private Dictionary<string, float> AggregateStorageQuantities(BuildingDefinition storageKind)
+        {
+            var totals = new Dictionary<string, float>();
+            foreach (var kvp in _definitionsById)
+            {
+                if (kvp.Value != storageKind) continue;
+                if (!_storageInventoriesByBuildingId.TryGetValue(kvp.Key, out var inventory)) continue;
+
+                foreach (var quantity in inventory.Quantities)
+                    totals[quantity.Key] = totals.TryGetValue(quantity.Key, out var existing) ? existing + quantity.Value : quantity.Value;
+            }
+
+            return totals;
         }
 
         private string ResourceDisplayName(string resourceId)

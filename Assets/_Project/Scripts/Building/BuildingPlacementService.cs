@@ -44,6 +44,12 @@ namespace Game.Building
                 return false;
             }
 
+            if (zone.BuildingId.HasValue)
+            {
+                missingResources.Add("zone-occupied");
+                return false;
+            }
+
             foreach (var cost in definition.Cost)
             {
                 if (!inventory.HasAtLeast(cost.ResourceId, cost.Quantity))

@@ -51,6 +51,12 @@ namespace Game.Colonists
         public Assignment CurrentAssignment { get; set; }
         public Guid? HousingId { get; set; }
 
+        // Un colon né par cohabitation en logement (FR-047) reste enfant jusqu'à sa majorité (18
+        // ans de temps de jeu) : IsChild=false pour tous les colons adultes, y compris ceux de
+        // départ (qui n'ont pas d'âge suivi). AgeSeconds n'est pertinent que tant qu'IsChild=true.
+        public bool IsChild { get; set; }
+        public float AgeSeconds { get; set; }
+
         public Colonist(Guid id, string name, Gender gender, string ethnicityId)
         {
             Id = id;

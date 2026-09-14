@@ -140,6 +140,9 @@ namespace Game.Core
         public Guid DestinationBuildingId;
         public Guid? AssignedColonistId;
         public Guid? AssignedVehicleId;
+        public string Phase;
+        public float PhaseProgress;
+        public float CarriedQuantity;
     }
 
     [Serializable]
