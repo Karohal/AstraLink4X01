@@ -509,8 +509,9 @@ namespace Game.Core
         }
 
         // Fantôme de placement (mode construire) : suit la case survolée, aligné sur la grille.
-        // Recréé seulement quand la forme change (extracteur/pompe = cylindre, sinon cube), pas à
-        // chaque frame.
+        // Recréé seulement quand la forme/le bâtiment sélectionné change, pas à chaque frame. La
+        // Pompe utilise le modèle réel (pompe_a_eau.fbx) comme le bâtiment placé (cf. usesPumpModel
+        // dans SyncBuildingViews) plutôt qu'un cylindre, pour un aperçu fidèle avant validation.
         private void SyncGhost()
         {
             var selected = _controller.SelectedBuildToPlace;
@@ -520,22 +521,43 @@ namespace Game.Core
                 return;
             }
 
+            var usesPumpModel = selected == _controller.PumpDefinition && _pumpModelPrefab != null;
+
             if (_ghostObject == null || _ghostForDefinition != selected)
             {
                 if (_ghostObject != null) Destroy(_ghostObject);
 
-                var primitive = IsCylinderShaped(_controller, selected) ? PrimitiveType.Cylinder : PrimitiveType.Cube;
-                _ghostObject = GameObject.CreatePrimitive(primitive);
+                if (usesPumpModel)
+                {
+                    _ghostObject = Instantiate(_pumpModelPrefab);
+
+                    // Le fantôme ne doit jamais intercepter un raycast (clics/survol de la grille) —
+                    // le modèle importé peut porter ses propres colliders, contrairement à une
+                    // primitive dont on en détruit un seul.
+                    foreach (var modelCollider in _ghostObject.GetComponentsInChildren<Collider>())
+                        Destroy(modelCollider);
+
+                    // Instances par renderer (Renderer.materials, pas sharedMaterial) pour ne jamais
+                    // modifier le matériau partagé du prefab/du modèle déjà placé.
+                    foreach (var renderer in _ghostObject.GetComponentsInChildren<Renderer>())
+                        foreach (var material in renderer.materials)
+                            MakeGhostTransparentPreservingLook(material, 0.45f);
+                }
+                else
+                {
+                    var primitive = IsCylinderShaped(_controller, selected) ? PrimitiveType.Cylinder : PrimitiveType.Cube;
+                    _ghostObject = GameObject.CreatePrimitive(primitive);
+
+                    var ghostCollider = _ghostObject.GetComponent<Collider>();
+                    if (ghostCollider != null) Destroy(ghostCollider); // le fantôme ne doit jamais intercepter un raycast
+
+                    var color = GetBuildingColor(selected);
+                    color.a = 0.45f;
+                    MakeTransparent(_ghostObject.GetComponent<Renderer>().material, color);
+                }
+
                 _ghostObject.name = "PlacementGhost";
                 _ghostObject.transform.SetParent(transform, false);
-
-                var ghostCollider = _ghostObject.GetComponent<Collider>();
-                if (ghostCollider != null) Destroy(ghostCollider); // le fantôme ne doit jamais intercepter un raycast
-
-                var color = GetBuildingColor(selected);
-                color.a = 0.45f;
-                MakeTransparent(_ghostObject.GetComponent<Renderer>().material, color);
-
                 _ghostForDefinition = selected;
             }
 
@@ -546,17 +568,31 @@ namespace Game.Core
             }
 
             _ghostObject.SetActive(true);
-            const float height = 1.2f;
+
             // FR-054 : le fantôme suit l'offset fractionnaire du curseur dans la case et l'orientation
             // choisie (touche R), pour prévisualiser le placement avant validation.
-            _ghostObject.transform.localPosition = new Vector3(_hoveredX + _hoveredOffsetX - 0.5f, height / 2f, _hoveredY + _hoveredOffsetY - 0.5f);
+            var posX = _hoveredX + _hoveredOffsetX - 0.5f;
+            var posZ = _hoveredY + _hoveredOffsetY - 0.5f;
             _ghostObject.transform.localRotation = Quaternion.Euler(0f, (float)_controller.PendingBuildRotation, 0f);
-            _ghostObject.transform.localScale = new Vector3(0.7f, height, 0.7f);
+
+            if (usesPumpModel)
+            {
+                // Modèle réel : aucun étirement, comme le bâtiment une fois placé (cf. usesPumpModel
+                // dans SyncBuildingViews).
+                _ghostObject.transform.localPosition = new Vector3(posX, 0f, posZ);
+                _ghostObject.transform.localScale = Vector3.one;
+            }
+            else
+            {
+                const float height = 1.2f;
+                _ghostObject.transform.localPosition = new Vector3(posX, height / 2f, posZ);
+                _ghostObject.transform.localScale = new Vector3(0.7f, height, 0.7f);
+            }
         }
 
         // Configure un matériau URP Lit en mode transparent (surface + blend + render queue), pour
-        // le fantôme de placement — recette standard URP, cf. MakeMatte pour le reflet.
-        private static void MakeTransparent(Material material, Color color)
+        // le fantôme de placement — recette standard URP.
+        private static void ApplyTransparentSurfaceSettings(Material material)
         {
             if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1f); // 1 = Transparent
             if (material.HasProperty("_Blend")) material.SetFloat("_Blend", 0f); // 0 = Alpha
@@ -566,8 +602,26 @@ namespace Game.Core
             material.SetOverrideTag("RenderType", "Transparent");
             material.EnableKeyword("_ALPHABLEND_ON");
             material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        }
+
+        // Fantôme en primitive (matériau par défaut, sans texture propre) : couleur imposée
+        // entièrement (cf. GetBuildingColor) et rendu mat (MakeMatte), comme avant.
+        private static void MakeTransparent(Material material, Color color)
+        {
+            ApplyTransparentSurfaceSettings(material);
             material.color = color;
             MakeMatte(material);
+        }
+
+        // Fantôme utilisant un modèle réel importé (pompe_a_eau.fbx) : conserve la teinte et le
+        // rendu (métallique/brillance) d'origine du matériau, ne réduit que son opacité — un flat
+        // color ou MakeMatte écraserait l'aspect du modèle importé.
+        private static void MakeGhostTransparentPreservingLook(Material material, float alpha)
+        {
+            ApplyTransparentSurfaceSettings(material);
+            var color = material.color;
+            color.a = alpha;
+            material.color = color;
         }
 
         private void HandleMouseClick()
