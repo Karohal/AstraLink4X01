@@ -170,6 +170,83 @@ recherche/extraction, transport.
 
 ---
 
+## Phase 6.5: Rework Module de survie & coût de construction combiné (FR-050–FR-053)
+
+**Purpose**: Clarification de conception du 2026-09-15 (cf. spec.md FR-050 à FR-053, data-model.md
+§ Module de survie / § Extracteur multifonction / § Catalogue de bâtiments), à intégrer avant les
+nouveaux bâtiments de contenu de US5 (Phase 7) qui en dépendent directement (coût en Crédits
+Galactiques). Touche du code déjà livré en US1 (T021)/US2 (T025, T027) : traité comme un rework
+ciblé plutôt qu'une réouverture de ces tâches.
+
+### Rework pour User Story 1 (Module de survie, Extracteur multifonction)
+
+- [ ] T079 [US1] Renommer « Abri de secours initial » en « Module de survie » dans le code et le
+  contenu existants (bootstrap `GameBootstrapService` T021, libellés UI de
+  `BuildingPlacementView`/fenêtre de gestion T029/T070 le cas échéant, nom du `BuildingDefinition`
+  ScriptableObject correspondant) — le champ C# `EstAbriInitial` (FR-007/FR-037/FR-050) est
+  conservé tel quel, seuls les libellés/commentaires FR et le nom de contenu changent, per
+  data-model.md § Module de survie / Bâtiment
+- [ ] T080 [US1] Implémenter l'inventaire consultable du Module de survie (FR-050) : ouverture au
+  clic sur le bâtiment (`EstAbriInitial = true`) d'une vue UI Toolkit listant la dotation initiale
+  de ressources (eau, nourriture, via `Inventory` T026) et les Extracteurs multifonction
+  disponibles, dans `Assets/_Project/Scripts/Building/SurvivalModuleInventoryView.cs` (dépend de
+  T026, T079)
+- [ ] T081 [P] [US1] Implémenter l'entité `MultiPurposeExtractor` (Extracteur multifonction) — `Id`,
+  `GisementCibleId` (`Guid?`, `null` si rangé dans l'inventaire du Module de survie), et
+  `TypesGisementAutorises` fixé à eau/pierre/bois (FR-051) — dans
+  `Assets/_Project/Scripts/Building/MultiPurposeExtractor.cs`, per data-model.md § Extracteur
+  multifonction
+- [ ] T082 [US1] Implémenter `IMultiPurposeExtractorService.PlaceOn`/`MoveTo` : place un des 5
+  exemplaires sur un gisement révélé dont le type de ressource est eau, pierre ou bois (refus sinon,
+  FR-051), sans phase de chantier, et permet de le déplacer ensuite vers un autre gisement
+  compatible à tout moment (`GisementCibleId` change directement, jamais de destruction/
+  reconstruction, FR-052) ; une fois placé, appelle la surcharge dédiée
+  `IExtractionService.Tick(Deposit, MultiPurposeExtractor, float)` (cf.
+  contracts/core-interfaces.md § Game.Economy, distincte de la surcharge `Building` de T034 puisque
+  ce n'est pas un `Building`) dans `Assets/_Project/Scripts/Economy/MultiPurposeExtractorService.cs`
+  (dépend de T034, T081)
+- [ ] T083 [US1] Persister la liste des Extracteurs multifonction (`GisementCibleId` par exemplaire)
+  — via `MultiPurposeExtractorSnapshotMapper` dédié, et ajouter la section `MultiPurposeExtractor`
+  correspondante à contracts/savegame-schema.md (absente à ce jour) dans
+  `Assets/_Project/Scripts/Building/MultiPurposeExtractorSnapshotMapper.cs` (dépend de T081)
+
+### Rework pour User Story 2 (coût de construction combiné)
+
+- [ ] T084 [P] [US2] Implémenter l'entité minimale `Treasury` (`Montant`, `float`) dans
+  `Assets/_Project/Scripts/Economy/Treasury.cs` — fait en avance sur T048 (US6), car T086
+  (coût combiné, FR-053) a besoin d'un solde déductible dès US2/US5 ; T048 étendra ce type avec
+  `RevenuImpotParTick`/`CoutChomageParTick` sans modifier `Montant`, per data-model.md § Trésorerie
+  / Crédits Galactiques
+- [ ] T091 [US2] Étendre `GameStateSnapshot`/`ISaveLoadService` pour persister `Treasury.Montant`
+  (FR-031/FR-053) dès la Phase 6.5, per contracts/savegame-schema.md § Treasury — nécessaire car
+  `Montant` devient mutable dès T086/T088/T089 (bien avant T048/US6) : sans cette persistance
+  anticipée, une sauvegarde/rechargement entre la fin de cette phase et la fin de US6 perdrait
+  silencieusement le solde de Crédits Galactiques dépensé (contradiction FR-031/FR-033/SC-010) dans
+  `Assets/_Project/Scripts/Core/SaveLoadService.cs` (dépend de T084)
+- [ ] T085 [US2] Étendre `BuildingDefinition` (T006) avec `CoutCreditsGalactiques` (`float`) — coût
+  en Crédits Galactiques d'un type de bâtiment, en complément de `Cout` en ressources, déduit
+  conjointement au lancement du chantier (FR-053) dans
+  `Assets/_Project/Scripts/Building/BuildingDefinition.cs` (dépend de T006)
+- [ ] T086 [US2] Étendre `IBuildingPlacementService.CanBuild`/`Build` (T027) pour prendre un
+  paramètre `Treasury` supplémentaire (cf. contracts/core-interfaces.md § Game.Building, signature
+  mise à jour) et déduire également `CoutCreditsGalactiques` du `Treasury.Montant` du joueur (T084),
+  refus explicite de la construction si le coût en ressources OU le coût en Crédits Galactiques
+  dépasse ce qui est disponible (FR-053) dans
+  `Assets/_Project/Scripts/Building/BuildingPlacementService.cs` (dépend de T027, T084, T085)
+- [ ] T087 [P] [US2] Tests EditMode : le bootstrap produit toujours un Module de survie fonctionnel
+  après renommage (aucune régression sur US1/US2), placement d'un Extracteur multifonction accepté
+  sur un gisement eau/pierre/bois et refusé sur un gisement incompatible, déplacement vers un autre
+  gisement compatible sans passer par un état intermédiaire de chantier, construction refusée si
+  `CoutCreditsGalactiques` insuffisant même avec un stock de ressources suffisant dans
+  `Assets/_Project/Tests/EditMode/Building/MultiPurposeExtractorServiceTests.cs` et une extension de
+  `Assets/_Project/Tests/EditMode/Building/BuildingPlacementServiceTests.cs`
+
+**Checkpoint**: Le Module de survie et le catalogue de bâtiments reflètent la clarification de
+conception du 2026-09-15 ; User Story 5 peut s'appuyer sur `CoutCreditsGalactiques` (T085) pour ses
+nouveaux bâtiments de contenu.
+
+---
+
 ## Phase 7: User Story 5 - Développer l'économie et l'industrie (Priority: P2)
 
 **Goal**: Des bâtiments de transformation convertissent des ressources brutes livrées par
@@ -185,8 +262,26 @@ reprise automatique.
 - [ ] T044 [US5] Implémenter `IProductionService.Tick` : consommation des entrées livrées par `ITransportService`, production des sorties, mise en pause automatique si intrant manquant ou stock de sortie plein, reprise automatique dès que la condition bloquante est levée (FR-015/FR-016), sans affecter les autres chaînes indépendantes dans `Assets/_Project/Scripts/Building/ProductionService.cs` (dépend de T039, T043)
 - [ ] T045 [US5] Étendre `GameStateSnapshot`/`ISaveLoadService` pour persister `productionRecipeState` (inputBuffer/outputBuffer) par bâtiment, per contracts/savegame-schema.md § Building (FR-031 tranche US5)
 - [ ] T046 [P] [US5] Tests EditMode : cycle de production consomme/produit, pause sur intrant manquant, pause sur stock de sortie plein, reprise automatique, chaînes indépendantes non affectées entre elles dans `Assets/_Project/Tests/EditMode/Building/ProductionServiceTests.cs`
+- [ ] T088 [P] [US5] Créer les `BuildingDefinition` de contenu (ScriptableObject) pour les 3
+  bâtiments primitifs « de fortune » (cf. spec.md § Assumptions, data-model.md § Catalogue de
+  bâtiments) : Ferme primitive, Puits (citerne primitive), Entrepôt primitif — coût en bois +
+  pierre et `CoutCreditsGalactiques` (T085) pour chacun, capacité de stockage d'eau de 5 à 10 m³
+  pour le Puits (valeur exacte d'équilibrage), dans
+  `Assets/_Project/ScriptableObjects/Buildings/{FermePrimitive,PuitsPrimitif,EntrepotPrimitif}.asset`
+  (dépend de T006, T085)
+- [ ] T089 [US5] Créer la `ProductionRecipe` de contenu de la Ferme primitive (T043) : consomme de
+  l'eau en continu, produit de la nourriture, `DureeCycle` d'équilibrage — première chaîne de
+  production concrète de US5, validée par le Independent Test de cette story dans
+  `Assets/_Project/ScriptableObjects/Buildings/FermePrimitiveRecipe.asset` (dépend de T043, T088)
+- [ ] T090 [P] [US5] Tests EditMode : le Puits primitif limite bien le stock d'eau à sa
+  `CapaciteMax` de contenu (5 à 10 m³, refus/plafonnement au-delà), la Ferme primitive consomme
+  l'eau livrée par transport et produit de la nourriture via `IProductionService` (T044) tant que
+  l'approvisionnement suit dans `Assets/_Project/Tests/EditMode/Building/PrimitiveBuildingsTests.cs`
+  (dépend de T044, T088, T089)
 
-**Checkpoint**: L'industrie fonctionne au-dessus de la boucle P1 sans la modifier.
+**Checkpoint**: L'industrie fonctionne au-dessus de la boucle P1 sans la modifier ; la Ferme
+primitive, le Puits et l'Entrepôt primitif donnent un premier catalogue de contenu concret pour
+cette story.
 
 ---
 
@@ -206,7 +301,7 @@ laisser un colon au chômage : la trésorerie diminue.
 - [ ] T048 [US6] Implémenter `ITreasuryService.ApplyEmploymentIncome` (impôt modulé par le rendement, FR-018) et `ApplyUnemploymentCost` (FR-019), plus `IsCritical()` (seuil réutilisé par US9 pour l'effondrement, FR-030/FR-036) dans `Assets/_Project/Scripts/Economy/TreasuryService.cs` (dépend de T047)
 - [ ] T049 [US6] Étendre `AssignmentService` (T013) avec `SetAssignmentMode`/`RunAutomaticAssignmentPass` — mode d'assignation manuel ou automatique choisi individuellement par colon (FR-035) dans `Assets/_Project/Scripts/Colonists/AssignmentService.cs` (dépend de T013)
 - [ ] T050 [US6] Remplacer le rendement provisoire de `ResearcherJobBinding` (T035) par `ISkillProgressionService.ComputeYield` réel dans `Assets/_Project/Scripts/Research/ResearcherJobBinding.cs` (dépend de T035, T047)
-- [ ] T051 [US6] Étendre `GameStateSnapshot`/`ISaveLoadService` pour persister les colons (compétences, santé, mode d'assignation, affectation) et la trésorerie, per contracts/savegame-schema.md § Colonist/Treasury (FR-031 tranche US6)
+- [ ] T051 [US6] Étendre `GameStateSnapshot`/`ISaveLoadService` pour persister les colons (compétences, santé, mode d'assignation, affectation) et les champs dérivés de la trésorerie (`RevenuImpotParTick`/`CoutChomageParTick`) — `Treasury.Montant` est déjà persisté depuis T091 (Phase 6.5), ne pas le redéfinir ici, per contracts/savegame-schema.md § Colonist/Treasury (FR-031 tranche US6)
 - [ ] T052 [P] [US6] Tests EditMode : progression sur le tas plafonnée, rendement dépendant de compétence+santé (bâtiment 100% pourvu mais peu compétent sous-performe), revenu d'impôt vs coût de chômage, mode d'assignation manuel/automatique respecté dans `Assets/_Project/Tests/EditMode/Colonists/SkillProgressionServiceTests.cs`, `Assets/_Project/Tests/EditMode/Economy/TreasuryServiceTests.cs` et `Assets/_Project/Tests/EditMode/Colonists/AssignmentServiceTests.cs`
 
 **Checkpoint**: L'économie complète (impôt, chômage, rendement réel, mode d'assignation) est
@@ -285,7 +380,7 @@ interférer avec la croissance démographique de US7.
 
 ## Phase 12: User Story 10 - Consulter et gérer chaque colon individuellement (Priority: P3)
 
-**Goal**: Depuis l'abri de secours initial, le joueur consulte la liste des colons, ouvre leur
+**Goal**: Depuis le Module de survie, le joueur consulte la liste des colons, ouvre leur
 fiche détaillée (genre, santé, compétence, éducation, ethnie, biographie), choisit leur mode
 d'assignation, les renomme et édite leur biographie — sans effet sur le gameplay.
 
@@ -298,7 +393,7 @@ santé/rendement.
 
 - [ ] T068 [P] [US10] Étendre `ColonistIdentityService` (T012) avec `Rename` (FR-039) dans `Assets/_Project/Scripts/Colonists/ColonistIdentityService.cs` (dépend de T012)
 - [ ] T069 [US10] Étendre `ColonistIdentityService` avec `SetBiography` — champ libre, optionnel, vide par défaut ; « la saisie DOIT être bloquée dès que 300 caractères sont atteints (sans troncature ni message d'erreur après coup) » (FR-041, citation verbatim data-model.md § Colon) ; aucun effet sur compétence/santé/rendement dans `Assets/_Project/Scripts/Colonists/ColonistIdentityService.cs` (dépend de T068)
-- [ ] T070 [P] [US10] Orchestrateur UI Toolkit : fenêtre de gestion ouverte depuis l'abri de secours initial listant les ressources disponibles et les colons par nom (FR-037) dans `Assets/_Project/Scripts/Colonists/ColonistManagementWindow.cs`
+- [ ] T070 [P] [US10] Orchestrateur UI Toolkit : fenêtre de gestion ouverte depuis le Module de survie listant les ressources disponibles et les colons par nom (FR-037) dans `Assets/_Project/Scripts/Colonists/ColonistManagementWindow.cs`
 - [ ] T071 [US10] Fiche détaillée UI Toolkit d'un colon : genre, santé, compétence par métier, formation en cours, ethnie, champ biographie à saisie bornée à 300 caractères (pas de message d'erreur, cf. T069), et contrôle radio manuel/automatique lié à `IAssignmentService.SetAssignmentMode` (FR-035/FR-038) dans `Assets/_Project/Scripts/Colonists/ColonistDetailView.cs` (dépend de T049, T068, T069, T070)
 - [ ] T072 [P] [US10] Tests EditMode : nom/ethnie/genre générés automatiquement, renommage conservé, biographie bornée à 300 caractères sans troncature d'erreur, aucun champ de généalogie n'existe dans `Assets/_Project/Tests/EditMode/Colonists/ColonistIdentityServiceTests.cs`
 - [ ] T073 [P] [US10] Test PlayMode : cliquer un colon dans la fenêtre de gestion ouvre sa fiche détaillée avec les champs attendus dans `Assets/_Project/Tests/PlayMode/Colonists/ColonistManagementWindowTests.cs`
@@ -330,6 +425,8 @@ santé/rendement.
   US5/US6/US7 (P2) et US8/US9/US10 (P3) s'appuient sur des services introduits par US1-US6 (cf.
   dépendances inter-tâches explicites ci-dessus) mais restent chacune indépendamment testable via
   son Independent Test
+- **Rework Module de survie (Phase 6.5)** : dépend de US1/US2 déjà complétées (T021, T025-T027) ;
+  bloque les tâches de contenu de US5 qui utilisent `CoutCreditsGalactiques` (T088)
 - **Polish (Phase 13)** : dépend de toutes les user stories retenues pour la release Phase 1
 
 ### User Story Dependencies
@@ -340,7 +437,8 @@ santé/rendement.
 - **US3 (P1)** : après US2 (a besoin de `IBuildingPlacementService`/chantier pour construire un
   extracteur)
 - **US4 (P1)** : après US3 (transporte la sortie d'un extracteur) — étend aussi US5 plus tard
-- **US5 (P2)** : après US4 (consomme des ressources livrées par transport)
+- **US5 (P2)** : après US4 (consomme des ressources livrées par transport) et après Phase 6.5
+  (T088/T089 utilisent `CoutCreditsGalactiques`, T085)
 - **US6 (P2)** : après US2/US3 (emploi de colons, dont le métier de chercheur introduit en US3)
 - **US7 (P2)** : après US2 (a besoin d'un bâtiment logement) et Foundational (`Colon.Genre`,
   `IColonistIdentityService.CreateColonist`) — n'a besoin ni de US5/US6 (économie) ni de US9
@@ -402,8 +500,8 @@ Task: "Implémenter GodModeCameraController dans Assets/_Project/Scripts/Core/Go
 
 1. Setup + Foundational → fondation prête
 2. US1 → US2 → US3 → US4 → boucle P1 complète (MVP Phase 1) → valider via quickstart.md 1-4
-3. US5 → US6 → US7 → économie/industrie, compétence/rendement réels, et naissances → valider via
-   quickstart.md 5-7
+3. Phase 6.5 (rework Module de survie, Extracteur multifonction, coût combiné) → US5 → US6 → US7 →
+   économie/industrie, compétence/rendement réels, et naissances → valider via quickstart.md 5-7
 4. US8 → US9 → US10 → université, développement de la civilisation, gestion des colons → valider
    via quickstart.md 8-10
 5. Phase 13 (Polish) → validation transverse SC-001 à SC-018, régression sauvegarde/chargement

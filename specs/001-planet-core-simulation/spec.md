@@ -25,8 +25,8 @@ entre sites d'extraction/production et sites de stockage/consommation doit être
 chaque colon a un nom et une ethnie générés automatiquement à sa création (renommable par le
 joueur), les nouveau-nés héritant de l'ethnie de la colonie, sans généalogie ; chaque colon dispose
 d'une biographie libre optionnelle (300 caractères max, saisie bloquée au-delà de la limite, vide
-par défaut, sans effet sur le gameplay) ; le joueur démarre avec un abri de secours initial depuis
-lequel il peut ouvrir une fenêtre listant les ressources disponibles et les colons par leur nom, et
+par défaut, sans effet sur le gameplay) ; le joueur démarre avec un Module de survie depuis lequel
+il peut ouvrir une fenêtre listant les ressources disponibles et les colons par leur nom, et
 cliquer sur un colon pour ouvrir sa fiche détaillée (santé, compétence par métier, éducation,
 ethnie, biographie éditable, et un contrôle pour choisir individuellement son mode d'assignation
 manuel ou automatique) ; la Phase 1 n'a pas de condition de victoire, mais un état d'échec
@@ -52,20 +52,20 @@ pilotant sa colonie depuis une vue d'ensemble de la planète.
 ### User Story 1 - Fonder la colonie et révéler le territoire (Priority: P1)
 
 En tant que joueur, je démarre une nouvelle partie sur une planète générée procéduralement, avec
-un abri de secours initial et une zone de départ visible, le reste de la surface étant masqué par
+un Module de survie et une zone de départ visible, le reste de la surface étant masqué par
 un brouillard de guerre qui se dissipe automatiquement autour de chaque bâtiment que je construis.
 
 **Why this priority**: C'est le point d'entrée de la partie : sans zone de départ visible, aucune
 construction ni aucune autre mécanique n'a d'endroit où démarrer. C'est le MVP minimal jouable.
 
 **Independent Test**: Lancer une nouvelle partie et vérifier qu'une zone de départ est visible
-autour de l'abri de secours initial, que le reste de la planète est masqué, et que construire un
+autour du Module de survie, que le reste de la planète est masqué, et que construire un
 bâtiment en bordure de zone visible dissipe le brouillard de guerre dans un rayon autour de lui.
 
 **Acceptance Scenarios**:
 
 1. **Given** une nouvelle partie vient d'être créée, **When** le joueur observe la planète pour la
-   première fois, **Then** une zone de départ est visible autour de l'abri de secours initial et
+   première fois, **Then** une zone de départ est visible autour du Module de survie et
    le reste de la surface est masqué par le brouillard de guerre.
 2. **Given** un bâtiment vient d'être construit en bordure de la zone visible, **When** sa
    construction se termine, **Then** le brouillard de guerre se dissipe automatiquement dans un
@@ -335,7 +335,7 @@ et de trésorerie sur une durée prolongée et vérifier qu'elle entre en état 
 
 ### User Story 10 - Consulter et gérer chaque colon individuellement (Priority: P3)
 
-En tant que joueur, j'ouvre depuis l'abri de secours initial une fenêtre listant les ressources
+En tant que joueur, j'ouvre depuis le Module de survie une fenêtre listant les ressources
 disponibles et mes colons par leur nom ; en cliquant sur un colon, j'accède à sa fiche détaillée
 (genre, santé, compétence par métier, éducation/formation en cours, ethnie, biographie éditable) et
 je peux y choisir son mode d'assignation individuel (manuel ou automatique), le renommer, et éditer
@@ -346,7 +346,7 @@ utilisée par les autres mécaniques (emploi, transport, formation, logement) ; 
 valeur dès que des colons existent (dotation de départ), mais n'est jamais bloquante pour les
 systèmes économiques ou démographiques eux-mêmes.
 
-**Independent Test**: Depuis l'abri de secours initial, ouvrir la fenêtre de gestion, vérifier
+**Independent Test**: Depuis le Module de survie, ouvrir la fenêtre de gestion, vérifier
 qu'elle liste les ressources et les colons par nom ; sélectionner un colon et vérifier que sa fiche
 affiche genre, santé, compétence, éducation, ethnie et biographie ; changer son mode d'assignation,
 le renommer, et éditer sa biographie (jusqu'à 300 caractères, saisie bloquée au-delà), puis vérifier
@@ -355,7 +355,7 @@ d'assignation, qui change qui décide de son affectation).
 
 **Acceptance Scenarios**:
 
-1. **Given** l'abri de secours initial est disponible, **When** le joueur ouvre la fenêtre de
+1. **Given** le Module de survie est disponible, **When** le joueur ouvre la fenêtre de
    gestion, **Then** la liste des ressources disponibles et la liste des colons par leur nom
    s'affichent.
 2. **Given** un colon créé (dotation de départ ou naissance dans la colonie, cf. User Story 7),
@@ -427,9 +427,9 @@ d'assignation, qui change qui décide de son affectation).
   constructible en dépensant les ressources requises par ce type de bâtiment.
 - **FR-006**: Le système DOIT refuser une construction dont le coût en ressources dépasse le stock
   disponible et DOIT indiquer au joueur les ressources manquantes.
-- **FR-007**: Le système DOIT fournir au joueur, dès le début de la partie, un abri de secours
-  initial ainsi qu'une dotation de ressources et de colons permettant de démarrer la construction,
-  l'emploi et la recherche sans dépendre d'une extraction déjà active.
+- **FR-007**: Le système DOIT fournir au joueur, dès le début de la partie, un Module de survie
+  ainsi qu'une dotation de ressources et de colons permettant de démarrer la construction, l'emploi
+  et la recherche sans dépendre d'une extraction déjà active.
 - **FR-008**: Le joueur DOIT pouvoir assigner un colon au métier de chercheur afin de faire
   progresser le déblocage, ressource par ressource, de la technologie nécessaire à son extraction.
 - **FR-009**: Le système NE DOIT PAS permettre la construction d'un extracteur pour une ressource
@@ -506,7 +506,7 @@ d'assignation, qui change qui décide de son affectation).
   détecter un état d'échec (effondrement de la colonie) lorsque des conditions critiques (par
   exemple une trésorerie ou des ressources vitales à zéro) persistent durablement, et DOIT en
   informer clairement le joueur.
-- **FR-037**: Le joueur DOIT pouvoir ouvrir, depuis l'abri de secours initial, une fenêtre affichant
+- **FR-037**: Le joueur DOIT pouvoir ouvrir, depuis le Module de survie, une fenêtre affichant
   les ressources disponibles et la liste des colons de la colonie par leur nom.
 - **FR-038**: Le joueur DOIT pouvoir sélectionner un colon dans cette liste pour ouvrir sa fiche
   détaillée, affichant son genre, sa santé, son niveau de compétence par métier, son
@@ -546,6 +546,23 @@ d'assignation, qui change qui décide de son affectation).
   la colonie (nourriture, eau) ni de sa trésorerie ; il DOIT être conditionné uniquement par la
   cohabitation homme/femme en logement sur la durée requise, sans intervention automatique du
   système au-delà de cette règle.
+- **FR-050**: Le Module de survie DOIT être traité comme un bâtiment à part entière (au même titre
+  que les autres bâtiments du catalogue) ; le joueur DOIT pouvoir cliquer dessus pour ouvrir un
+  inventaire consultable listant la dotation initiale de ressources (eau, nourriture) ainsi que les
+  Extracteurs multifonction disponibles.
+- **FR-051**: Le système DOIT fournir, dans l'inventaire du Module de survie, 5 Extracteurs
+  multifonction : des équipements d'extraction portatifs, distincts des extracteurs/pompes fixes
+  (cf. FR-010), utilisables uniquement sur un gisement d'eau, de pierre ou de bois.
+- **FR-052**: Le joueur DOIT pouvoir placer un Extracteur multifonction disponible sur un gisement
+  compatible (eau, pierre ou bois) révélé, puis le déplacer à tout moment vers un autre gisement
+  compatible, sans phase de chantier ni destruction/reconstruction de l'équipement ; une fois placé,
+  il extrait la ressource de son gisement au même titre qu'un extracteur fixe opérationnel.
+- **FR-053**: Le catalogue de bâtiments (FR-044) DOIT pouvoir associer à chaque type de bâtiment,
+  en complément de son coût en ressources (FR-005/FR-006), un coût en Crédits Galactiques
+  représentant le salaire des ouvriers du chantier ; les deux coûts DOIVENT être déduits ensemble au
+  lancement de la construction, et celle-ci DOIT être refusée si l'un ou l'autre des deux coûts
+  dépasse ce qui est disponible. Les Crédits Galactiques désignent la même trésorerie que celle
+  définie en User Story 6 (FR-018/FR-019) : il ne s'agit pas d'une devise distincte.
 
 ### Key Entities
 
@@ -564,8 +581,15 @@ d'assignation, qui change qui décide de son affectation).
   également être un prérequis pour d'autres types de bâtiments (cf. catalogue de bâtiments).
 - **Ressource** : élément brut ou transformé stocké dans l'inventaire du joueur, consommé ou
   produit par l'extraction, le transport, la construction ou la production.
-- **Abri de secours initial** : bâtiment de départ fourni au joueur, point d'accès à la fenêtre de
-  gestion des ressources et des colons.
+- **Module de survie** : bâtiment de départ fourni au joueur (traité comme un bâtiment à part
+  entière), point d'accès à la fenêtre de gestion des ressources et des colons, et à un inventaire
+  consultable en cliquant dessus contenant la dotation initiale de ressources (eau, nourriture) et
+  les Extracteurs multifonction disponibles.
+- **Extracteur multifonction** : équipement d'extraction portatif et déplaçable (distinct des
+  extracteurs/pompes fixes), fourni en 5 exemplaires dans l'inventaire du Module de survie,
+  utilisable uniquement sur un gisement d'eau, de pierre ou de bois ; le joueur choisit sur quel
+  gisement compatible le placer, et peut le déplacer vers un autre gisement compatible à tout
+  moment.
 - **Bâtiment** : structure lancée en construction par le joueur sur une zone révélée ; passe par un
   état de chantier (dont la progression nécessite un colon assigné et dépend d'une durée propre à
   son type, cf. catalogue de bâtiments) avant de devenir opérationnel ; peut être un bâtiment de
@@ -573,8 +597,12 @@ d'assignation, qui change qui décide de son affectation).
   de naissance), un poste d'emploi (dont la recherche ou l'université), ou lié au développement de
   la civilisation.
 - **Catalogue de bâtiments** : structure de données de contenu extensible (hors spec/plan) listant
-  les types de bâtiments disponibles, leur coût, leurs prérequis technologiques éventuels et leur
-  durée de chantier ; s'enrichit sans modifier cette spécification.
+  les types de bâtiments disponibles, leur coût combiné en ressources et en Crédits Galactiques
+  (FR-053), leurs prérequis technologiques éventuels et leur durée de chantier ; s'enrichit sans
+  modifier cette spécification.
+- **Crédits Galactiques** : désignation narrative de la trésorerie du joueur (cf. entité Trésorerie,
+  User Story 6), également mobilisée pour couvrir le coût en main-d'œuvre d'une construction
+  (FR-053) ; ce n'est pas une devise distincte de la Trésorerie.
 - **Colon** : unité de population possédant un nom, une ethnie et un genre (homme ou femme) générés
   automatiquement (nom renommable, sans généalogie), une biographie libre optionnelle sans effet
   sur le gameplay, un niveau de compétence par métier, un niveau de santé, et un mode d'assignation
@@ -639,7 +667,7 @@ d'assignation, qui change qui décide de son affectation).
 - **SC-012**: Un joueur peut choisir individuellement, pour chaque colon depuis sa fiche détaillée,
   un mode d'assignation manuel ou automatique, et constater que ce choix est respecté par le
   système d'assignation.
-- **SC-013**: Un joueur peut consulter, depuis l'abri de secours initial, la liste de ses colons par
+- **SC-013**: Un joueur peut consulter, depuis le Module de survie, la liste de ses colons par
   nom et la fiche détaillée de chacun (genre, santé, compétence, éducation, ethnie, biographie).
 - **SC-014**: Un joueur peut renommer un colon et éditer sa biographie (saisie bloquée à 300
   caractères) sans que cela n'affecte sa compétence, sa santé ou son rendement.
@@ -707,3 +735,15 @@ d'assignation, qui change qui décide de son affectation).
   nombre de colons supplémentaires qui y résident au-delà du couple minimal homme/femme requis ;
   un logement hébergeant plusieurs couples potentiels ne produit pas plusieurs naissances
   simultanées.
+- Une fois les colons relogés dans de véritables logements (US7), le Module de survie pourra être
+  démantelé pour récupérer une partie de ses ressources ; cette mécanique de démantèlement n'est
+  pas spécifiée ni implémentée en Phase 1 et sera détaillée ultérieurement si besoin.
+- Le catalogue de bâtiments (FR-044) est attendu, au minimum, pour matérialiser dès User Story 5
+  trois bâtiments primitifs « de fortune », en attendant leurs équivalents avancés : une Ferme
+  primitive (coût bois + pierre, consomme de l'eau en continu pour produire de la nourriture, taux
+  d'équilibrage à définir), un Puits/citerne primitive (coût bois + pierre, faible capacité de
+  stockage d'eau de l'ordre de 5 à 10 m³, en attendant une citerne avancée nécessitant du fer, une
+  ressource non extractible en tout début de partie), et un Entrepôt primitif (coût bois + pierre,
+  en attendant un entrepôt avancé nécessitant d'autres matériaux). Les valeurs exactes (taux,
+  capacités, coûts) restent des paramètres d'équilibrage à définir en planification/contenu, au même
+  titre que le reste du catalogue.

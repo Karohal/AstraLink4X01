@@ -52,8 +52,8 @@ public interface IFogOfWarService
 ```csharp
 public interface IBuildingPlacementService
 {
-    bool CanBuild(Planet planet, BuildingDefinition definition, int x, int y, Inventory inventory); // vérifie le coût (FR-006) ; le catalogue peut aussi porter des PrerequisTechnologiques (FR-044) pour de futurs types de bâtiments, sans que cela soit exercé par le contenu connu de la Phase 1 au-delà du cas extracteur déjà couvert par IExtractionService.CanBuildExtractor
-    Building Build(Planet planet, BuildingDefinition definition, int x, int y, Inventory inventory); // déduit le coût, démarre le bâtiment en état EnChantier (FR-005/FR-042)
+    bool CanBuild(Planet planet, BuildingDefinition definition, int x, int y, Inventory inventory, Treasury treasury); // vérifie le coût en ressources (FR-006) ET en Crédits Galactiques (FR-053) ; le catalogue peut aussi porter des PrerequisTechnologiques (FR-044) pour de futurs types de bâtiments, sans que cela soit exercé par le contenu connu de la Phase 1 au-delà du cas extracteur déjà couvert par IExtractionService.CanBuildExtractor
+    Building Build(Planet planet, BuildingDefinition definition, int x, int y, Inventory inventory, Treasury treasury); // déduit le coût en ressources ET en Crédits Galactiques (BuildingDefinition.CoutCreditsGalactiques), démarre le bâtiment en état EnChantier (FR-005/FR-042/FR-053)
 }
 
 public interface IConstructionSiteService
@@ -83,7 +83,8 @@ public interface IResearchService
 public interface IExtractionService
 {
     bool CanBuildExtractor(Deposit deposit, Technology technology); // FR-009
-    void Tick(Deposit deposit, Building extractor, float deltaSimTime); // FR-010/FR-011
+    void Tick(Deposit deposit, Building extractor, float deltaSimTime); // FR-010/FR-011 — extracteur fixe (construit via chantier)
+    void Tick(Deposit deposit, MultiPurposeExtractor extractor, float deltaSimTime); // FR-051/FR-052 — surcharge pour un Extracteur multifonction placé/déplacé sans chantier (pas de Building)
 }
 
 public interface ITreasuryService

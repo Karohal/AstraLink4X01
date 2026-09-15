@@ -89,6 +89,7 @@ normale plutôt que sous l'eau.
 |---|---|---|
 | `Id` | identifiant de catalogue | Type de bâtiment |
 | `Cout` | `(RessourceId, Quantite)[]` | Coût en ressources, déduit au lancement du chantier (FR-005/FR-006) |
+| `CoutCreditsGalactiques` | `float` | Coût en Crédits Galactiques (= Trésorerie, cf. entité Trésorerie ci-dessous), déduit conjointement au `Cout` en ressources au lancement du chantier (FR-053) ; refus de construction si l'un ou l'autre coût dépasse ce qui est disponible |
 | `DureeChantier` | `float` | Durée de chantier propre à ce type de bâtiment ; valeur de contenu/équilibrage, pas fixée par la spec (FR-042) |
 | `PrerequisTechnologiques` | référence(s) `TechnologyDefinition`, optionnel | Technologie(s) devant être débloquée(s) avant de pouvoir lancer ce type de bâtiment (FR-044), en plus du cas particulier des extracteurs (gisement + technologie, FR-009) |
 | `RayonBrouillard` | `int` | Rayon de dissipation du brouillard de guerre à la construction (FR-004) |
@@ -107,7 +108,17 @@ nouveaux `BuildingDefinition` peuvent être ajoutés au fil du développement sa
 spécification ni le plan technique ; seul le mécanisme générique de déblocage (ressources, et le
 cas échéant technologie/gisement) reste fixé ici.
 
-## Abri de secours initial / Bâtiment (`Game.Building`)
+**Extension (contenu) — bâtiments primitifs attendus pour US5** : trois `BuildingDefinition` « de
+fortune », coût `Cout` = bois + pierre, en attendant leurs équivalents avancés (valeurs exactes
+d'équilibrage à définir) :
+- **Ferme primitive** : consomme de l'eau en continu (taux dépendant de taille/technologie) pour
+  produire de la nourriture — premier `Recette`/`Chaîne de production` de US5.
+- **Puits (citerne primitive)** : `CapaciteMax` de stockage d'eau faible (5 à 10 m³), en attendant
+  une citerne avancée nécessitant du fer (ressource non extractible en tout début de partie).
+- **Entrepôt primitif** : stockage générique, en attendant un entrepôt avancé nécessitant d'autres
+  matériaux.
+
+## Module de survie / Bâtiment (`Game.Building`)
 
 | Champ | Type | Description |
 |---|---|---|
@@ -117,7 +128,23 @@ cas échéant technologie/gisement) reste fixé ici.
 | `Etat` | `BatimentEtat` (enum) | `EnChantier` → `Operationnel` ; pour les bâtiments de transformation : `Operationnel` ↔ `EnPause` (FR-016) |
 | `ProgresChantier` | `float` | Progression du chantier, de 0 à `DureeChantier` ; n'avance que si au moins un colon est assigné (FR-042/FR-043) |
 | `PostesEmploi` | `PosteEmploi[]` | Postes ouverts par ce bâtiment une fois opérationnel (dont chercheur, université) |
-| `EstAbriInitial` | `bool` | Vrai uniquement pour le bâtiment de départ (FR-007/FR-037) |
+| `EstAbriInitial` | `bool` | Vrai uniquement pour le Module de survie, le bâtiment de départ (FR-007/FR-037/FR-050) |
+| `Inventaire` | `Inventory` | Uniquement pour le Module de survie (`EstAbriInitial = true`) : dotation initiale de ressources (eau, nourriture) et les `ExtracteurMultifonction` disponibles, consultable en cliquant sur le bâtiment (FR-050) |
+
+## Extracteur multifonction (`Game.Building` ou `Game.Economy`)
+
+| Champ | Type | Description |
+|---|---|---|
+| `Id` | `Guid` | Identifiant de cet exemplaire (parmi les 5 fournis, FR-051) |
+| `GisementCibleId` | `Guid?` | Gisement sur lequel l'exemplaire est actuellement placé ; `null` s'il est rangé dans l'inventaire du Module de survie et non placé |
+| `TypesGisementAutorises` | `RessourceId[]` (fixe : eau, pierre, bois) | Types de gisement compatibles (FR-051) |
+
+**Transitions** : contrairement à un extracteur/une pompe fixe (`Batiment`), un `ExtracteurMultifonction`
+n'entre jamais en chantier : le joueur le place directement sur un gisement compatible révélé
+(`GisementCibleId` passe de `null` à l'Id du gisement) ou le déplace vers un autre gisement
+compatible à tout moment (`GisementCibleId` change directement, sans passer par `null`) — jamais de
+destruction/reconstruction (FR-052). Une fois placé, il extrait la ressource de son gisement au même
+titre qu'un extracteur fixe opérationnel (réutilise `IExtractionService.Tick`, US3).
 
 **Transitions** : `EnChantier → Operationnel` quand `ProgresChantier` atteint `DureeChantier`, ce
 qui ne peut arriver que pendant qu'au moins un colon est assigné au chantier (`AffectationType.
@@ -210,10 +237,12 @@ automatiquement le logement (`LogementId` réinitialisé) et devient un colon ad
 un niveau de compétence initial de 25% (cohérent avec le plafond d'un colon sans éducation
 formelle) pour les métiers déjà pratiqués par les colons de départ.
 
-**Important** : l'abri de secours initial (`EstAbriInitial = true`) n'est PAS un logement au sens de
-ce système (`EstLogement = false`) — les colons de départ y vivent sans `LogementId` défini, et
-aucune naissance n'y est possible ; il faut construire un premier logement dédié (Abri basique) pour
-qu'un couple puisse se former et qu'une naissance devienne possible.
+**Important** : le Module de survie (`EstAbriInitial = true`) n'est PAS un logement au sens de ce
+système (`EstLogement = false`) — les colons de départ y vivent sans `LogementId` défini, et aucune
+naissance n'y est possible ; il faut construire un premier logement dédié (Abri basique) pour qu'un
+couple puisse se former et qu'une naissance devienne possible. Une fois ce relogement effectif, le
+Module de survie pourra être démantelé pour récupérer une partie de ses ressources — mécanique hors
+périmètre de cette spécification, à détailler ultérieurement (cf. spec.md § Assumptions).
 
 ## Tâche de transport (`Game.Logistics`)
 
@@ -272,7 +301,11 @@ d'un trajet source → destination est la moyenne des modificateurs des cases tr
 capacité suffisante est active (FR-012/FR-014) ; sans tâche assignée, la ressource s'accumule sur
 place (Edge Case).
 
-## Trésorerie (`Game.Economy`)
+## Trésorerie / Crédits Galactiques (`Game.Economy`)
+
+« Crédits Galactiques » est la désignation narrative de cette même entité (FR-053) — pas une
+devise distincte ; `BuildingDefinition.CoutCreditsGalactiques` est déduit de `Montant` au même
+titre que `RevenuImpotParTick`/`CoutChomageParTick` l'alimentent ou le réduisent.
 
 | Champ | Type | Description |
 |---|---|---|
@@ -313,3 +346,5 @@ naissances (Cohabitation de logement) même en `Stagnation` ou `Effondrement` (F
 - `Batiment` 1—1 `BuildingDefinition` (catalogue) ; `BuildingDefinition` 0..N `TechnologyDefinition` (prérequis, FR-044).
 - `Batiment` (logement, `EstLogement = true`) 1—1 `Cohabitation de logement` ; `Colon` 0..1 `LogementId` référençant un tel `Batiment` (0..N `Colon` résidents par logement).
 - `Colon` 0..1 `Affectation` de type `Construction` ciblant un `Batiment` en état `EnChantier`.
+- Module de survie (`Batiment` avec `EstAbriInitial = true`) 1—1 `Inventaire` ; 1—5 `ExtracteurMultifonction`.
+- `ExtracteurMultifonction` 0..1 `Gisement de ressource` (via `GisementCibleId`, uniquement eau/pierre/bois).

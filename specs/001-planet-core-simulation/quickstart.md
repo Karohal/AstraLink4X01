@@ -15,7 +15,7 @@ comportement de bout en bout dans le jeu réel.
 ## 1. Fonder la colonie et révéler le territoire (US1)
 
 1. Lancer une nouvelle partie.
-2. Observer la planète : une zone de départ autour de l'abri de secours initial doit être visible,
+2. Observer la planète : une zone de départ autour du Module de survie doit être visible,
    le reste masqué par le brouillard de guerre.
 3. Construire un bâtiment en bordure de la zone visible.
 4. **Attendu** : le brouillard de guerre se dissipe automatiquement dans un rayon autour du
@@ -36,7 +36,7 @@ comportement de bout en bout dans le jeu réel.
 
 ## 3. Débloquer et exploiter des ressources (US3)
 
-1. Ouvrir la fenêtre de gestion des colons depuis l'abri de secours initial (cf. scénario 10).
+1. Ouvrir la fenêtre de gestion des colons depuis le Module de survie (cf. scénario 10).
 2. Assigner un colon au métier de chercheur.
 3. Laisser le temps de jeu s'écouler jusqu'au déblocage d'une technologie d'extraction.
 4. Tenter de construire un extracteur sur le gisement correspondant AVANT le déblocage : doit être
@@ -112,7 +112,7 @@ comportement de bout en bout dans le jeu réel.
 
 ## 10. Consulter et gérer chaque colon individuellement (US10)
 
-1. Depuis l'abri de secours initial, ouvrir la fenêtre de gestion.
+1. Depuis le Module de survie, ouvrir la fenêtre de gestion.
 2. **Attendu** : la liste des ressources disponibles et la liste des colons par nom s'affichent
    (SC-013).
 3. Cliquer sur un colon : sa fiche détaillée doit afficher genre, santé, compétence par métier,
