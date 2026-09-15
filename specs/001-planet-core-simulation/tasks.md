@@ -250,12 +250,16 @@ ciblé plutôt qu'une réouverture de ces tâches.
 
 ### Positionnement libre, rotation, et contrainte d'adjacence de la pompe (FR-054/FR-055)
 
-- [ ] T092 [US2] Étendre `BuildingInstance` avec `PositionOffset` (`Vector2`, 0..1 sur chaque axe,
+- [X] T092 [US2] Étendre `BuildingInstance` avec `PositionOffset` (`Vector2`, 0..1 sur chaque axe,
   défaut `(0.5, 0.5)`) et `Rotation` (`0°/90°/180°/270°`), purement cosmétiques (FR-054, aucune
   règle de jeu n'en dépend) ; exposer un contrôle de positionnement/rotation dans
   `BuildingPlacementView` (T029) avant validation du placement dans
-  `Assets/_Project/Scripts/Building/BuildingInstance.cs` (dépend de T025)
-- [ ] T093 [US2] Ajouter `GisementCibleX`/`GisementCibleY` à `BuildingInstance` (coordonnées du
+  `Assets/_Project/Scripts/Building/BuildingInstance.cs` (dépend de T025) — implémenté en `OffsetX`/
+  `OffsetY` (`float`, pas de `Vector2` pour rester sans dépendance Unity, Principe III) ; pas de
+  fichier `BuildingPlacementView.cs` dédié (n'existe pas dans le code réel) — le contrôle est dans
+  `Phase1GameView.cs` : l'offset se dérive du point d'impact du raycast sur la case survolée
+  (aucun slider dédié), la rotation se pilote à la touche R (cycle 0/90/180/270)
+- [X] T093 [US2] Ajouter `GisementCibleX`/`GisementCibleY` à `BuildingInstance` (coordonnées du
   gisement réellement exploité, identiques à `Position` par défaut) ; renommer
   `BuildingDefinition.CanBuildOnWater` en `ExtraitEauAdjacente` (FR-055) et inverser sa sémantique :
   refuse désormais la construction sur une case d'eau elle-même, accepte une case constructible
@@ -264,12 +268,18 @@ ciblé plutôt qu'une réouverture de ces tâches.
   supposaient jusqu'ici `zone.Deposit` == gisement de la case du bâtiment (extraction, assignation,
   transport) dans `Assets/_Project/Scripts/Building/BuildingDefinition.cs`,
   `Assets/_Project/Scripts/Building/BuildingPlacementService.cs` et
-  `Assets/_Project/Scripts/Core/Phase1GameController.cs` (dépend de T025, T092)
-- [ ] T094 [P] [US2] Tests EditMode : placement refusé directement sur une case d'eau pour une pompe,
+  `Assets/_Project/Scripts/Core/Phase1GameController.cs` (dépend de T025, T092) — implémenté en
+  `DepositX`/`DepositY` (anglais, cf. Principe III) ; `Phase1TestHarness.cs` (scène de debug
+  séparée) partage `BuildingPlacementService` donc hérite aussi du nouveau comportement, mais ses
+  messages UI propres n'ont pas été synchronisés (convention existante : ce fichier n'est
+  volontairement plus maintenu en parallèle)
+- [X] T094 [P] [US2] Tests EditMode : placement refusé directement sur une case d'eau pour une pompe,
   accepté sur une case adjacente à l'eau (extraction ciblant bien la case voisine) et sur une case à
   gisement nappe phréatique (extraction ciblant sa propre case), positionnement/rotation persistés
   sans effet sur le coût/la durée de chantier dans
-  `Assets/_Project/Tests/EditMode/Building/BuildingPlacementServiceTests.cs` (extension)
+  `Assets/_Project/Tests/EditMode/Building/BuildingPlacementServiceTests.cs` (extension) — l'ancien
+  test `CanBuild_OnWaterTile_ReturnsFalse_UnlessDefinitionAllowsWater` (qui vérifiait le comportement
+  inverse) a été remplacé par 6 tests dédiés
 
 **Checkpoint**: Le Module de survie et le catalogue de bâtiments reflètent la clarification de
 conception du 2026-09-15 ; User Story 5 peut s'appuyer sur `CoutCreditsGalactiques` (T085) pour ses
