@@ -42,7 +42,7 @@ namespace Game.Procedural
         BootstrapResult Bootstrap(BootstrapConfig config);
     }
 
-    // Point d'entrée de partie : place l'abri de secours initial et révèle la zone de départ
+    // Point d'entrée de partie : place le Module de survie et révèle la zone de départ
     // (FR-007/FR-003), puis dote la colonie en colons avec compétences aléatoires (FR-021) et
     // une répartition de genre ~50/50 (FR-046).
     public sealed class GameBootstrapService : IGameBootstrapService

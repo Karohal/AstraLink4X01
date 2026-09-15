@@ -96,7 +96,7 @@ namespace Game.EditorTools
             content.ShelterDefinition = CreateOrLoad<BuildingDefinition>($"{ContentRoot}/Buildings/StartingShelter.asset", so =>
             {
                 so.FindProperty("_id").stringValue = "starting-shelter";
-                so.FindProperty("_displayName").stringValue = "Abri de secours";
+                so.FindProperty("_displayName").stringValue = "Module de survie";
                 so.FindProperty("_constructionDuration").floatValue = 0f;
                 so.FindProperty("_fogRadius").intValue = 0;
             });

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: StartingShelter
   m_EditorClassIdentifier: Game.Runtime::Game.Building.BuildingDefinition
   _id: starting-shelter
-  _displayName: Abri de secours
+  _displayName: Module de survie
   _cost: []
   _constructionDuration: 0
   _technologyPrerequisiteIds: []

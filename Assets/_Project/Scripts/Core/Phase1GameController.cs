@@ -69,6 +69,7 @@ namespace Game.Core
         private readonly FogOfWarConstructionListener _fogListener;
         private readonly IHousingService _housingService;
         private readonly IHousingBirthService _housingBirthService;
+        private readonly IMultiPurposeExtractorService _multiPurposeExtractorService;
 
         public Planet Planet { get; private set; }
         public BuildingInstance Shelter { get; private set; }
@@ -89,6 +90,13 @@ namespace Game.Core
         private JobSlot _researcherSlot;
         public readonly Dictionary<Guid, JobSlot> OperatorSlotsByBuildingId = new Dictionary<Guid, JobSlot>();
         public readonly Dictionary<Guid, HousingCohabitation> HousingCohabitationsByBuildingId = new Dictionary<Guid, HousingCohabitation>();
+
+        // Inventaire du Module de survie (FR-050/FR-051) : 5 exemplaires fournis au démarrage,
+        // initialement non placés (IsPlaced == false) ; leur production rejoint directement
+        // Warehouse (cf. IMultiPurposeExtractorService.Tick).
+        public readonly List<MultiPurposeExtractor> MultiPurposeExtractors = new List<MultiPurposeExtractor>();
+        public const int MultiPurposeExtractorCount = 5;
+
         public bool IsReady { get; private set; }
 
         // Ressources de base (bois/pierre/eau) : pas de verrou technologique à la construction
@@ -116,6 +124,11 @@ namespace Game.Core
         // Colon en attente d'une assignation manuelle à un bâtiment précis (bouton "Assigner" de sa
         // fiche) : le prochain clic sur un bâtiment dans la vue valide l'assignation.
         public Guid? PendingAssignmentColonistId;
+
+        // Extracteur multifonction en attente de placement/déplacement (bouton "Placer"/"Déplacer"
+        // du panneau du Module de survie, FR-052) : le prochain clic sur une case dans la vue
+        // valide le placement.
+        public Guid? PendingMultiPurposeExtractorId;
 
         private readonly System.Random _random = new System.Random();
 
@@ -187,6 +200,7 @@ namespace Game.Core
             _transportService = new TransportService();
             _housingService = new HousingService();
             _housingBirthService = new HousingBirthService(_identityService);
+            _multiPurposeExtractorService = new MultiPurposeExtractorService();
             _clock = new SimulationClock();
             _clock.OnTick += Tick;
             _saveLoadService = new SaveLoadService(Application.persistentDataPath);
@@ -291,6 +305,10 @@ namespace Game.Core
             SelectedDestinationBuildingId = null;
             PendingAssignmentColonistId = null;
 
+            MultiPurposeExtractors.Clear();
+            for (var i = 0; i < MultiPurposeExtractorCount; i++)
+                MultiPurposeExtractors.Add(new MultiPurposeExtractor(Guid.NewGuid()));
+
             Warehouse = new Inventory();
             Warehouse.SetQuantity(_materialsResource.Id, _startingMaterials);
 
@@ -351,6 +369,9 @@ namespace Game.Core
 
             if (TechnologiesByResourceId.TryGetValue(SelectedResearchResourceId, out var activeTechnology))
                 _researcherJobBinding.Tick(Colonists, new[] { _researcherSlot }, activeTechnology, deltaSimTime);
+
+            foreach (var extractor in MultiPurposeExtractors)
+                _multiPurposeExtractorService.Tick(extractor, Planet, Warehouse, deltaSimTime);
 
             foreach (var building in Buildings)
             {
@@ -627,6 +648,31 @@ namespace Game.Core
             LastMessage = $"{colonist.Name} assigné au transport vers {destinationDef.DisplayName} ({destinationBuilding.X},{destinationBuilding.Y}).";
         }
 
+        // Bouton "Placer"/"Déplacer" de la fiche d'un Extracteur multifonction (fenêtre d'inventaire
+        // du Module de survie, cf. FR-050/FR-051/FR-052) : place/déplace directement, pas de
+        // chantier ni de destruction/reconstruction.
+        public bool TryPlaceMultiPurposeExtractor(MultiPurposeExtractor extractor, int x, int y)
+        {
+            if (extractor == null) return false;
+
+            var otherExtractors = MultiPurposeExtractors.Where(e => e.Id != extractor.Id).ToList();
+            if (!_multiPurposeExtractorService.CanPlaceOn(Planet, _baseResourceIds, otherExtractors, x, y, out var reason))
+            {
+                LastMessage = reason switch
+                {
+                    "invalid-zone" => "Zone invalide ou non révélée pour un Extracteur multifonction.",
+                    "incompatible-deposit" => "Un Extracteur multifonction ne peut être placé que sur un gisement d'eau, de pierre ou de bois.",
+                    "deposit-occupied" => "Un autre Extracteur multifonction est déjà placé sur ce gisement.",
+                    _ => "Placement refusé."
+                };
+                return false;
+            }
+
+            _multiPurposeExtractorService.PlaceOn(extractor, Planet, _baseResourceIds, otherExtractors, x, y);
+            LastMessage = $"Extracteur multifonction placé en ({x},{y}).";
+            return true;
+        }
+
         public bool TryGetStorageBuilding(Guid buildingId, out BuildingInstance building, out BuildingDefinition definition)
         {
             building = Buildings.FirstOrDefault(b => b.Id == buildingId);
@@ -746,6 +792,22 @@ namespace Game.Core
             LastMessage = "Assignation manuelle annulée.";
         }
 
+        // Étape 1 du bouton "Placer"/"Déplacer" d'un Extracteur multifonction : arme le prochain
+        // clic sur une case dans la vue (cf. TryPlaceMultiPurposeExtractor, appelé par la vue au
+        // clic).
+        public void BeginMultiPurposeExtractorPlacement(MultiPurposeExtractor extractor)
+        {
+            PendingMultiPurposeExtractorId = extractor.Id;
+            LastMessage = "Cliquez une case dans la vue pour y placer l'Extracteur multifonction (Échap pour annuler).";
+        }
+
+        public void CancelPendingMultiPurposeExtractorPlacement()
+        {
+            if (!PendingMultiPurposeExtractorId.HasValue) return;
+            PendingMultiPurposeExtractorId = null;
+            LastMessage = "Placement d'Extracteur multifonction annulé.";
+        }
+
         // Lien direct colon -> bâtiment choisi par le joueur (bouton "Assigner"), plutôt que les
         // raccourcis contextuels existants (AssignToConstruction/AssignToExtraction/AssignToResearch,
         // qui visent le bâtiment actuellement sélectionné). Détermine le type de poste selon le
@@ -802,7 +864,7 @@ namespace Game.Core
             var building = GetSelectedBuilding();
             if (building == null || building.IsStartingShelter)
             {
-                LastMessage = "Sélectionnez un bâtiment recyclable (pas l'abri de secours).";
+                LastMessage = "Sélectionnez un bâtiment recyclable (pas le Module de survie).";
                 return;
             }
 

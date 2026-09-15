@@ -160,6 +160,9 @@ namespace Game.Core
             if (_controller.PendingAssignmentColonistId.HasValue && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
                 _controller.CancelPendingAssignment();
 
+            if (_controller.PendingMultiPurposeExtractorId.HasValue && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+                _controller.CancelPendingMultiPurposeExtractorPlacement();
+
             _fogRefreshTimer -= Time.deltaTime;
             if (_fogRefreshTimer <= 0f)
             {
@@ -580,7 +583,11 @@ namespace Game.Core
             var buildingMarker = hit.collider.GetComponent<BuildingMarker>();
             if (buildingMarker != null)
             {
-                if (_controller.PendingAssignmentColonistId.HasValue)
+                if (_controller.PendingMultiPurposeExtractorId.HasValue)
+                {
+                    ResolvePendingMultiPurposeExtractorPlacement(buildingMarker.X, buildingMarker.Y);
+                }
+                else if (_controller.PendingAssignmentColonistId.HasValue)
                 {
                     ResolvePendingAssignment(buildingMarker.BuildingId);
                 }
@@ -599,7 +606,11 @@ namespace Game.Core
             var tileMarker = hit.collider.GetComponent<TileMarker>();
             if (tileMarker != null)
             {
-                if (_controller.PendingAssignmentColonistId.HasValue)
+                if (_controller.PendingMultiPurposeExtractorId.HasValue)
+                {
+                    ResolvePendingMultiPurposeExtractorPlacement(tileMarker.X, tileMarker.Y);
+                }
+                else if (_controller.PendingAssignmentColonistId.HasValue)
                 {
                     _controller.LastMessage = "Sélectionnez un bâtiment (pas une case vide) pour l'assignation manuelle.";
                 }
@@ -613,6 +624,20 @@ namespace Game.Core
                     _controller.SelectedY = tileMarker.Y;
                 }
             }
+        }
+
+        // Valide le bouton "Placer"/"Déplacer" du panneau du Module de survie (FR-052) : la case
+        // cliquée (bâtiment ou case vide, peu importe) est proposée comme cible, le contrôleur/
+        // service valide le gisement.
+        private void ResolvePendingMultiPurposeExtractorPlacement(int x, int y)
+        {
+            var extractorId = _controller.PendingMultiPurposeExtractorId;
+            _controller.PendingMultiPurposeExtractorId = null;
+
+            var extractor = _controller.MultiPurposeExtractors.FirstOrDefault(e => e.Id == extractorId);
+            if (extractor == null) return;
+
+            _controller.TryPlaceMultiPurposeExtractor(extractor, x, y);
         }
 
         // Valide le bouton "Assigner" de la fiche colon (point 3) : le colon en attente est lié au
@@ -1099,6 +1124,9 @@ namespace Game.Core
                 }
             }
 
+            if (building.IsStartingShelter)
+                DrawSurvivalModuleInventory();
+
             if (!building.IsStartingShelter)
             {
                 var chantierNonCommence = building.State == BuildingState.UnderConstruction && building.ConstructionProgress <= 0f;
@@ -1111,6 +1139,43 @@ namespace Game.Core
                 {
                     _controller.RecycleSelectedBuilding();
                 }
+            }
+        }
+
+        // Inventaire consultable du Module de survie (FR-050) : dotation de ressources (Warehouse,
+        // le même stock global que celui consommé par les constructions — le Module de survie n'a
+        // pas de réserve isolée) et les 5 Extracteurs multifonction (FR-051/FR-052).
+        private void DrawSurvivalModuleInventory()
+        {
+            GUILayout.Label("Inventaire du Module de survie :");
+            foreach (var kvp in _controller.Warehouse.Quantities)
+                GUILayout.Label($"  {_controller.ResourceDisplayName(kvp.Key)} : {kvp.Value:0.0}");
+
+            GUILayout.Space(6);
+            GUILayout.Label("Extracteurs multifonction :");
+            foreach (var extractor in _controller.MultiPurposeExtractors)
+            {
+                var isPending = _controller.PendingMultiPurposeExtractorId == extractor.Id;
+                string status;
+                if (extractor.IsPlaced)
+                {
+                    _controller.Planet.TryGetZone(extractor.TargetX.Value, extractor.TargetY.Value, out var zone);
+                    var resourceLabel = zone?.Deposit != null ? _controller.ResourceDisplayName(zone.Deposit.ResourceId) : "?";
+                    status = $"en ({extractor.TargetX},{extractor.TargetY}) — {resourceLabel}";
+                }
+                else
+                {
+                    status = "dans l'inventaire";
+                }
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Label($"  {status}", GUILayout.Width(220));
+                if (GUILayout.Button(isPending ? "Cliquez une case…" : (extractor.IsPlaced ? "Déplacer" : "Placer")))
+                {
+                    if (isPending) _controller.CancelPendingMultiPurposeExtractorPlacement();
+                    else _controller.BeginMultiPurposeExtractorPlacement(extractor);
+                }
+                GUILayout.EndHorizontal();
             }
         }
 

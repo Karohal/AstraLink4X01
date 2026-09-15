@@ -569,7 +569,7 @@ namespace Game.Core
             var building = GetSelectedBuilding();
             if (building == null || building.IsStartingShelter)
             {
-                _lastMessage = "Sélectionnez un bâtiment recyclable (pas l'abri de secours).";
+                _lastMessage = "Sélectionnez un bâtiment recyclable (pas le Module de survie).";
                 return;
             }
 
