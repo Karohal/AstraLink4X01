@@ -23,7 +23,7 @@ namespace Game.Building
         [SerializeField] private int _fogRadius = 5;
         [SerializeField] private string[] _jobIds;
         [SerializeField] private bool _isHousing;
-        [SerializeField] private bool _canBuildOnWater;
+        [SerializeField] private bool _extractsAdjacentWater;
         [SerializeField] private float _recycleRefundRatio = 0.5f;
 
         [Header("Logement (si EstLogement)")]
@@ -41,9 +41,13 @@ namespace Game.Building
         public string[] JobIds => _jobIds ?? Array.Empty<string>();
         public bool IsHousing => _isHousing;
 
-        // Vrai uniquement pour les bâtiments d'extraction liquide (pompe) : autorise le placement
-        // sur une case d'eau, seule exception à la règle générale Zone.EstConstructible.
-        public bool CanBuildOnWater => _canBuildOnWater;
+        // Vrai uniquement pour les bâtiments d'extraction liquide (pompe, FR-055) : le bâtiment ne
+        // se construit JAMAIS directement sur une case d'eau (aucune exception à
+        // Zone.EstConstructible, contrairement à l'ancienne règle) ; il se construit sur une case
+        // constructible adjacente à une case d'eau (exploite alors le gisement voisin) ou sur une
+        // case à gisement nappe phréatique (exploite alors son propre gisement) — cf.
+        // BuildingPlacementService.
+        public bool ExtractsAdjacentWater => _extractsAdjacentWater;
 
         // Fraction du coût initial remboursée au recyclage (valeur d'équilibrage du catalogue de
         // contenu, pas de la spec — cf. data-model.md § Recyclage).
@@ -61,7 +65,7 @@ namespace Game.Building
         // et normalement renseignés via l'Inspector.
         public void Initialize(string id, string displayName, ResourceAmount[] cost, float constructionDuration,
             string[] technologyPrerequisiteIds = null, int fogRadius = 5, string[] jobIds = null, bool isHousing = false,
-            bool canBuildOnWater = false, float recycleRefundRatio = 0.5f,
+            bool extractsAdjacentWater = false, float recycleRefundRatio = 0.5f,
             int maxAdultResidents = 2, int maxChildResidents = 2,
             float birthAttemptIntervalSeconds = 30f, float birthAttemptSuccessChance = 0.1f)
         {
@@ -73,7 +77,7 @@ namespace Game.Building
             _fogRadius = fogRadius;
             _jobIds = jobIds;
             _isHousing = isHousing;
-            _canBuildOnWater = canBuildOnWater;
+            _extractsAdjacentWater = extractsAdjacentWater;
             _recycleRefundRatio = recycleRefundRatio;
             _maxAdultResidents = maxAdultResidents;
             _maxChildResidents = maxChildResidents;

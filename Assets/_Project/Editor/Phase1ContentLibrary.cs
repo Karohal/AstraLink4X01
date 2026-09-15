@@ -134,7 +134,7 @@ namespace Game.EditorTools
                 so.FindProperty("_displayName").stringValue = "Pompe";
                 so.FindProperty("_constructionDuration").floatValue = 6f;
                 so.FindProperty("_fogRadius").intValue = 4;
-                so.FindProperty("_canBuildOnWater").boolValue = true;
+                so.FindProperty("_extractsAdjacentWater").boolValue = true;
                 SetCost(so, ("materials", 40f));
             });
 

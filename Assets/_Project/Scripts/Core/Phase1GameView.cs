@@ -79,6 +79,12 @@ namespace Game.Core
         private int _previousHoveredX = -1;
         private int _previousHoveredY = -1;
 
+        // Position fractionnaire (0..1) du curseur dans la case survolée (FR-054) : dérivée du point
+        // d'impact du raycast sur le quad de sol, réutilisée telle quelle comme offset de
+        // positionnement libre plutôt que d'exposer des sliders dédiés — 0.5/0.5 = centré.
+        private float _hoveredOffsetX = 0.5f;
+        private float _hoveredOffsetY = 0.5f;
+
         private GUIStyle _titleStyle;
         private GUIStyle _discreetInfoStyle;
         private Vector2 _categoryScroll;
@@ -162,6 +168,10 @@ namespace Game.Core
 
             if (_controller.PendingMultiPurposeExtractorId.HasValue && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
                 _controller.CancelPendingMultiPurposeExtractorPlacement();
+
+            // FR-054 : touche R pour faire pivoter le bâtiment en cours de placement (0°/90°/180°/270°).
+            if (_controller.SelectedBuildToPlace != null && Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame)
+                _controller.RotatePendingBuild();
 
             _fogRefreshTimer -= Time.deltaTime;
             if (_fogRefreshTimer <= 0f)
@@ -343,6 +353,8 @@ namespace Game.Core
             {
                 _hoveredX = tileMarker.X;
                 _hoveredY = tileMarker.Y;
+                _hoveredOffsetX = Mathf.Clamp01(hit.point.x - tileMarker.X + 0.5f);
+                _hoveredOffsetY = Mathf.Clamp01(hit.point.z - tileMarker.Y + 0.5f);
                 return;
             }
 
@@ -351,6 +363,8 @@ namespace Game.Core
             {
                 _hoveredX = buildingMarker.X;
                 _hoveredY = buildingMarker.Y;
+                _hoveredOffsetX = 0.5f;
+                _hoveredOffsetY = 0.5f;
             }
         }
 
@@ -432,17 +446,22 @@ namespace Game.Core
 
                 var isOperational = building.IsOperational;
 
+                // FR-054 : positionnement libre dans la case + rotation, purement cosmétiques.
+                var posX = building.X + building.OffsetX - 0.5f;
+                var posZ = building.Y + building.OffsetY - 0.5f;
+                go.transform.localRotation = Quaternion.Euler(0f, (float)building.Rotation, 0f);
+
                 if (usesPumpModel)
                 {
                     // Modèle réel : un étirement non-uniforme (comme les primitives) déformerait sa
                     // géométrie — seule une réduction d'échelle uniforme distingue le chantier.
-                    go.transform.localPosition = new Vector3(building.X, 0f, building.Y);
+                    go.transform.localPosition = new Vector3(posX, 0f, posZ);
                     go.transform.localScale = Vector3.one * (isOperational ? 1f : 0.6f);
                 }
                 else
                 {
                     var height = isOperational ? 1.2f : 0.6f; // chantier : visuellement plus bas (distinct de l'opérationnel)
-                    go.transform.localPosition = new Vector3(building.X, height / 2f, building.Y);
+                    go.transform.localPosition = new Vector3(posX, height / 2f, posZ);
                     go.transform.localScale = new Vector3(0.7f, height, 0.7f);
 
                     var color = GetBuildingColor(definition);
@@ -528,7 +547,10 @@ namespace Game.Core
 
             _ghostObject.SetActive(true);
             const float height = 1.2f;
-            _ghostObject.transform.localPosition = new Vector3(_hoveredX, height / 2f, _hoveredY);
+            // FR-054 : le fantôme suit l'offset fractionnaire du curseur dans la case et l'orientation
+            // choisie (touche R), pour prévisualiser le placement avant validation.
+            _ghostObject.transform.localPosition = new Vector3(_hoveredX + _hoveredOffsetX - 0.5f, height / 2f, _hoveredY + _hoveredOffsetY - 0.5f);
+            _ghostObject.transform.localRotation = Quaternion.Euler(0f, (float)_controller.PendingBuildRotation, 0f);
             _ghostObject.transform.localScale = new Vector3(0.7f, height, 0.7f);
         }
 
@@ -593,7 +615,7 @@ namespace Game.Core
                 }
                 else if (_controller.SelectedBuildToPlace != null)
                 {
-                    _controller.TryBuild(buildingMarker.X, buildingMarker.Y); // occupé : refusé par le service, message explicite
+                    _controller.TryBuild(buildingMarker.X, buildingMarker.Y, _hoveredOffsetX, _hoveredOffsetY, _controller.PendingBuildRotation); // occupé : refusé par le service, message explicite
                 }
                 else
                 {
@@ -616,7 +638,7 @@ namespace Game.Core
                 }
                 else if (_controller.SelectedBuildToPlace != null)
                 {
-                    _controller.TryBuild(tileMarker.X, tileMarker.Y);
+                    _controller.TryBuild(tileMarker.X, tileMarker.Y, _hoveredOffsetX, _hoveredOffsetY, _controller.PendingBuildRotation);
                 }
                 else
                 {
@@ -1077,7 +1099,7 @@ namespace Game.Core
             if (def == _controller.ExtractorDefinition || def == _controller.PumpDefinition)
             {
                 var workers = _controller.GetAssignedWorkers(building.Id);
-                _controller.Planet.TryGetZone(building.X, building.Y, out var zone);
+                _controller.Planet.TryGetZone(building.DepositX, building.DepositY, out var zone);
                 var extractionJobId = zone?.Deposit != null && zone.Deposit.ResourceId == _controller.WoodResource.Id
                     ? JobDefinition.WoodcutterJobId
                     : JobDefinition.MinerJobId;
@@ -1217,6 +1239,7 @@ namespace Game.Core
             {
                 _controller.SelectedBuildToPlace = definition;
                 _openCategory = null; // referme le panel Construction : ne bloque plus la vue pendant le placement
+                _controller.LastMessage = "Déplacez la souris dans la case pour positionner, R pour pivoter (FR-054), clic pour valider.";
             }
         }
 

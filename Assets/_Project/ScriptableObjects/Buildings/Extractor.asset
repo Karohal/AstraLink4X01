@@ -22,7 +22,7 @@ MonoBehaviour:
   _fogRadius: 4
   _jobIds: []
   _isHousing: 0
-  _canBuildOnWater: 0
+  _extractsAdjacentWater: 0
   _recycleRefundRatio: 0.5
   _maxAdultResidents: 2
   _maxChildResidents: 2

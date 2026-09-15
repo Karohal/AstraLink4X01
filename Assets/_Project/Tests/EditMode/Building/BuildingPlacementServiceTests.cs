@@ -62,25 +62,126 @@ namespace Game.Tests.EditMode.Building
             CollectionAssert.Contains(missing, "wood");
         }
 
-        [Test]
-        public void CanBuild_OnWaterTile_ReturnsFalse_UnlessDefinitionAllowsWater()
+        // FR-055 : la pompe ne se construit plus jamais directement sur l'eau (contrairement à
+        // l'ancienne règle FR-044) ; elle exige soit une case adjacente à l'eau, soit un gisement
+        // nappe phréatique sur sa propre case. Grille 3x3 : (1,1) = eau + gisement, (0,1) = terre
+        // adjacente sans gisement, (0,0) = terre non adjacente, (2,2) = terre avec son propre
+        // gisement (nappe phréatique).
+        private static Planet CreatePlanetWithWaterAndLand()
         {
-            var zones = new Zone[1, 1];
-            var waterZone = new Zone(new GridPosition(0, 0), TerrainType.Water, isBuildable: false);
-            waterZone.Reveal();
-            zones[0, 0] = waterZone;
-            var planet = new Planet(System.Guid.NewGuid(), 0, 1, 1, zones);
+            var zones = new Zone[3, 3];
+            for (var x = 0; x < 3; x++)
+            for (var y = 0; y < 3; y++)
+            {
+                Zone zone;
+                if (x == 1 && y == 1)
+                    zone = new Zone(new GridPosition(x, y), TerrainType.Water, false, new Deposit("water", 500f, true));
+                else if (x == 2 && y == 2)
+                    zone = new Zone(new GridPosition(x, y), TerrainType.Plains, true, new Deposit("water", 200f, true)); // nappe phréatique
+                else
+                    zone = new Zone(new GridPosition(x, y), TerrainType.Plains, true);
 
-            var landOnlyDefinition = CreateDefinition(0f);
+                zone.Reveal();
+                zones[x, y] = zone;
+            }
+
+            return new Planet(System.Guid.NewGuid(), 0, 3, 3, zones);
+        }
+
+        private static BuildingDefinition CreatePumpDefinition()
+        {
+            var pumpDefinition = ScriptableObject.CreateInstance<BuildingDefinition>();
+            pumpDefinition.Initialize("pump", "Pump", new ResourceAmount[0], 0f, extractsAdjacentWater: true);
+            return pumpDefinition;
+        }
+
+        [Test]
+        public void CanBuild_Pump_OnWaterTile_ReturnsFalse()
+        {
+            var planet = CreatePlanetWithWaterAndLand();
+            var pumpDefinition = CreatePumpDefinition();
             var inventory = new Inventory();
 
             var service = new BuildingPlacementService();
-            Assert.IsFalse(service.CanBuild(planet, landOnlyDefinition, 0, 0, inventory, out _)); // pas de pompe
+            var canBuild = service.CanBuild(planet, pumpDefinition, 1, 1, inventory, out var missing);
 
-            var pumpDefinition = ScriptableObject.CreateInstance<BuildingDefinition>();
-            pumpDefinition.Initialize("pump", "Pump", new ResourceAmount[0], 0f, canBuildOnWater: true);
+            Assert.IsFalse(canBuild); // FR-055 : jamais directement sur l'eau
+            CollectionAssert.Contains(missing, "cannot-build-on-water");
+        }
 
-            Assert.IsTrue(service.CanBuild(planet, pumpDefinition, 0, 0, inventory, out _)); // FR-044
+        [Test]
+        public void CanBuild_Pump_OnLandAdjacentToWater_ReturnsTrue_AndTargetsNeighborDeposit()
+        {
+            var planet = CreatePlanetWithWaterAndLand();
+            var pumpDefinition = CreatePumpDefinition();
+            var inventory = new Inventory();
+
+            var service = new BuildingPlacementService();
+            Assert.IsTrue(service.CanBuild(planet, pumpDefinition, 0, 1, inventory, out _)); // FR-055 : adjacent à (1,1)
+
+            var pump = service.Build(planet, pumpDefinition, 0, 1, inventory);
+            Assert.AreEqual(0, pump.X);
+            Assert.AreEqual(1, pump.Y);
+            Assert.AreEqual(1, pump.DepositX); // exploite le gisement voisin, pas le sien
+            Assert.AreEqual(1, pump.DepositY);
+        }
+
+        [Test]
+        public void CanBuild_Pump_OnLandNotAdjacentToWater_ReturnsFalse()
+        {
+            var planet = CreatePlanetWithWaterAndLand();
+            var pumpDefinition = CreatePumpDefinition();
+            var inventory = new Inventory();
+
+            var service = new BuildingPlacementService();
+            var canBuild = service.CanBuild(planet, pumpDefinition, 0, 0, inventory, out var missing); // aucun voisin en eau
+
+            Assert.IsFalse(canBuild);
+            CollectionAssert.Contains(missing, "no-adjacent-water");
+        }
+
+        [Test]
+        public void CanBuild_Pump_OnGroundwaterDeposit_ReturnsTrue_AndTargetsOwnZone()
+        {
+            var planet = CreatePlanetWithWaterAndLand();
+            var pumpDefinition = CreatePumpDefinition();
+            var inventory = new Inventory();
+
+            var service = new BuildingPlacementService();
+            Assert.IsTrue(service.CanBuild(planet, pumpDefinition, 2, 2, inventory, out _)); // nappe phréatique
+
+            var pump = service.Build(planet, pumpDefinition, 2, 2, inventory);
+            Assert.AreEqual(2, pump.DepositX); // exploite son propre gisement
+            Assert.AreEqual(2, pump.DepositY);
+        }
+
+        [Test]
+        public void Build_NonPumpDefinition_DepositTargetDefaultsToOwnZone()
+        {
+            var planet = CreateRevealedPlanet();
+            var definition = CreateDefinition(0f);
+            var inventory = new Inventory();
+
+            var service = new BuildingPlacementService();
+            var building = service.Build(planet, definition, 2, 2, inventory);
+
+            Assert.AreEqual(2, building.DepositX);
+            Assert.AreEqual(2, building.DepositY);
+        }
+
+        [Test]
+        public void Build_WithOffsetAndRotation_PersistsCosmeticPlacement()
+        {
+            var planet = CreateRevealedPlanet();
+            var definition = CreateDefinition(0f);
+            var inventory = new Inventory();
+
+            var service = new BuildingPlacementService();
+            var building = service.Build(planet, definition, 2, 2, inventory, offsetX: 0.2f, offsetY: 0.8f, rotation: BuildingRotation.Deg90);
+
+            Assert.AreEqual(0.2f, building.OffsetX); // FR-054 : purement cosmétique
+            Assert.AreEqual(0.8f, building.OffsetY);
+            Assert.AreEqual(BuildingRotation.Deg90, building.Rotation);
         }
 
         [Test]

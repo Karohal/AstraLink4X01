@@ -106,6 +106,12 @@ namespace Game.Core
         public int SelectedX = -1;
         public int SelectedY = -1;
         public BuildingDefinition SelectedBuildToPlace;
+
+        // Orientation choisie pour le prochain bâtiment posé (FR-054), cycle 0°/90°/180°/270° via
+        // RotatePendingBuild ; conservée d'un placement à l'autre tant que le joueur ne l'annule pas
+        // explicitement (CancelBuildSelection), pour poser plusieurs exemplaires identiques de suite.
+        public BuildingRotation PendingBuildRotation = BuildingRotation.Deg0;
+
         public string LastMessage = string.Empty;
         public string SaveSlotName = "phase1-game";
 
@@ -350,7 +356,7 @@ namespace Game.Core
                 if (!DefinitionsById.TryGetValue(building.Id, out var definition)) continue;
                 if (definition != _extractorDefinition && definition != _pumpDefinition) continue;
                 if (!building.IsOperational) continue;
-                if (!Planet.TryGetZone(building.X, building.Y, out var zone) || zone.Deposit == null) continue;
+                if (!Planet.TryGetZone(building.DepositX, building.DepositY, out var zone) || zone.Deposit == null) continue;
 
                 if (zone.Deposit.State != DepositState.Extracting && zone.Deposit.State != DepositState.Depleted)
                     _extractionService.BeginExtraction(zone.Deposit);
@@ -413,7 +419,7 @@ namespace Game.Core
             }
         }
 
-        public void TryBuild(int x, int y)
+        public void TryBuild(int x, int y, float offsetX = 0.5f, float offsetY = 0.5f, BuildingRotation rotation = BuildingRotation.Deg0)
         {
             if (SelectedBuildToPlace == null)
             {
@@ -427,8 +433,14 @@ namespace Game.Core
                 return;
             }
 
-            var isExtractorLike = SelectedBuildToPlace == _extractorDefinition || SelectedBuildToPlace == _pumpDefinition;
-            if (isExtractorLike)
+            var isPump = SelectedBuildToPlace == _pumpDefinition;
+            var isExtractorLike = SelectedBuildToPlace == _extractorDefinition || isPump;
+
+            // FR-055 : la pompe ne cible plus le gisement de sa propre case (sauf nappe phréatique)
+            // mais celui d'une case d'eau adjacente — la validation détaillée (adjacence, nappe,
+            // jamais sur l'eau) est déléguée à IBuildingPlacementService.CanBuild ci-dessous ; ce
+            // bloc ne gère plus que le cas de l'extracteur classique (gisement sur sa propre case).
+            if (isExtractorLike && !isPump)
             {
                 if (zone.Deposit == null)
                 {
@@ -436,13 +448,7 @@ namespace Game.Core
                     return;
                 }
 
-                var isWaterDeposit = zone.Deposit.ResourceId == _waterResource.Id;
-                if (SelectedBuildToPlace == _pumpDefinition && !isWaterDeposit)
-                {
-                    LastMessage = "Une pompe ne peut être construite que sur une case d'eau ou une nappe phréatique.";
-                    return;
-                }
-                if (SelectedBuildToPlace == _extractorDefinition && isWaterDeposit)
+                if (zone.Deposit.ResourceId == _waterResource.Id)
                 {
                     LastMessage = "L'eau se pompe : utilisez une pompe, pas un extracteur.";
                     return;
@@ -463,11 +469,16 @@ namespace Game.Core
 
             if (!_placementService.CanBuild(Planet, SelectedBuildToPlace, x, y, Warehouse, out var missing))
             {
-                LastMessage = "Construction refusée, ressources manquantes : " + string.Join(", ", missing);
+                if (missing.Contains("cannot-build-on-water"))
+                    LastMessage = "Une pompe ne peut pas être construite directement sur une case d'eau (FR-055) : ciblez une case adjacente.";
+                else if (missing.Contains("no-adjacent-water"))
+                    LastMessage = "Aucune case d'eau adjacente ni nappe phréatique ici : la pompe ne peut pas s'y approvisionner.";
+                else
+                    LastMessage = "Construction refusée, ressources manquantes : " + string.Join(", ", missing);
                 return;
             }
 
-            var building = _placementService.Build(Planet, SelectedBuildToPlace, x, y, Warehouse);
+            var building = _placementService.Build(Planet, SelectedBuildToPlace, x, y, Warehouse, offsetX, offsetY, rotation);
             Buildings.Add(building);
             DefinitionsById[building.Id] = SelectedBuildToPlace;
 
@@ -539,7 +550,7 @@ namespace Game.Core
 
             if (!OperatorSlotsByBuildingId.TryGetValue(building.Id, out var slot))
             {
-                Planet.TryGetZone(building.X, building.Y, out var zone);
+                Planet.TryGetZone(building.DepositX, building.DepositY, out var zone);
                 var jobId = zone?.Deposit != null ? GetExtractionJobId(zone.Deposit.ResourceId) : JobDefinition.MinerJobId;
                 slot = new JobSlot(Guid.NewGuid(), jobId, building.Id);
                 OperatorSlotsByBuildingId[building.Id] = slot;
@@ -578,7 +589,7 @@ namespace Game.Core
 
             if (definition == _extractorDefinition || definition == _pumpDefinition)
             {
-                Planet.TryGetZone(building.X, building.Y, out var zone);
+                Planet.TryGetZone(building.DepositX, building.DepositY, out var zone);
                 return zone?.Deposit != null ? GetExtractionJobId(zone.Deposit.ResourceId) : JobDefinition.MinerJobId;
             }
 
@@ -612,7 +623,7 @@ namespace Game.Core
                 return;
             }
 
-            if (!Planet.TryGetZone(building.X, building.Y, out var zone) || zone.Deposit == null)
+            if (!Planet.TryGetZone(building.DepositX, building.DepositY, out var zone) || zone.Deposit == null)
             {
                 LastMessage = "Gisement introuvable pour ce bâtiment.";
                 return;
@@ -831,7 +842,7 @@ namespace Game.Core
             {
                 if (!OperatorSlotsByBuildingId.TryGetValue(building.Id, out var slot))
                 {
-                    Planet.TryGetZone(building.X, building.Y, out var zone);
+                    Planet.TryGetZone(building.DepositX, building.DepositY, out var zone);
                     var jobId = zone?.Deposit != null ? GetExtractionJobId(zone.Deposit.ResourceId) : JobDefinition.MinerJobId;
                     slot = new JobSlot(Guid.NewGuid(), jobId, building.Id);
                     OperatorSlotsByBuildingId[building.Id] = slot;
@@ -911,7 +922,20 @@ namespace Game.Core
         public void CancelBuildSelection()
         {
             SelectedBuildToPlace = null;
+            PendingBuildRotation = BuildingRotation.Deg0;
             LastMessage = "Sélection de construction annulée.";
+        }
+
+        // Bouton/touche "Pivoter" pendant le placement (FR-054) : cycle 0° -> 90° -> 180° -> 270° -> 0°.
+        public void RotatePendingBuild()
+        {
+            PendingBuildRotation = PendingBuildRotation switch
+            {
+                BuildingRotation.Deg0 => BuildingRotation.Deg90,
+                BuildingRotation.Deg90 => BuildingRotation.Deg180,
+                BuildingRotation.Deg180 => BuildingRotation.Deg270,
+                _ => BuildingRotation.Deg0
+            };
         }
 
         private void RemoveBuildingBookkeeping(BuildingInstance building)

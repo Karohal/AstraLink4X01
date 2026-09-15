@@ -8,7 +8,11 @@ namespace Game.Building
     public interface IBuildingPlacementService
     {
         bool CanBuild(Planet planet, BuildingDefinition definition, int x, int y, Inventory inventory, out List<string> missingResources);
-        BuildingInstance Build(Planet planet, BuildingDefinition definition, int x, int y, Inventory inventory);
+
+        // offsetX/offsetY (0..1, défaut centré) et rotation : positionnement libre dans la case et
+        // orientation choisis par le joueur avant validation (FR-054), purement cosmétiques.
+        BuildingInstance Build(Planet planet, BuildingDefinition definition, int x, int y, Inventory inventory,
+            float offsetX = 0.5f, float offsetY = 0.5f, BuildingRotation rotation = BuildingRotation.Deg0);
 
         // Recyclage : détruit le bâtiment (libère la zone) et rembourse une fraction de son coût
         // initial (BuildingDefinition.RecycleRefundRatio, valeur d'équilibrage du catalogue de
@@ -35,12 +39,17 @@ namespace Game.Building
                 return false;
             }
 
-            // Cas particulier de la pompe (FR-044) : seul type de bâtiment autorisé sur une case
-            // d'eau, sinon la règle générale Zone.EstConstructible s'applique.
-            var canPlaceOnTerrain = zone.IsBuildable || (definition.CanBuildOnWater && zone.Terrain == TerrainType.Water);
-            if (!canPlaceOnTerrain)
+            if (!zone.IsBuildable)
             {
+                // FR-055 : plus aucune exception liée à l'eau ici (une pompe ne se construit jamais
+                // directement sur l'eau) — cf. TryResolveDepositTarget pour la règle d'adjacence.
                 missingResources.Add("invalid-zone");
+                return false;
+            }
+
+            if (!TryResolveDepositTarget(planet, definition, zone, x, y, out _, out _, out var depositReason))
+            {
+                missingResources.Add(depositReason);
                 return false;
             }
 
@@ -60,7 +69,8 @@ namespace Game.Building
         }
 
         // FR-005/FR-042 : déduit le coût et démarre le bâtiment en chantier (pas encore opérationnel).
-        public BuildingInstance Build(Planet planet, BuildingDefinition definition, int x, int y, Inventory inventory)
+        public BuildingInstance Build(Planet planet, BuildingDefinition definition, int x, int y, Inventory inventory,
+            float offsetX = 0.5f, float offsetY = 0.5f, BuildingRotation rotation = BuildingRotation.Deg0)
         {
             if (!CanBuild(planet, definition, x, y, inventory, out var missing))
                 throw new InvalidOperationException($"Cannot build {definition.Id}: {string.Join(",", missing)}");
@@ -69,10 +79,67 @@ namespace Game.Building
                 inventory.TryRemove(cost.ResourceId, cost.Quantity);
 
             planet.TryGetZone(x, y, out var zone);
-            var building = new BuildingInstance(Guid.NewGuid(), definition.Id, x, y);
+            TryResolveDepositTarget(planet, definition, zone, x, y, out var depositX, out var depositY, out _);
+            var building = new BuildingInstance(Guid.NewGuid(), definition.Id, x, y,
+                depositX: depositX, depositY: depositY, offsetX: offsetX, offsetY: offsetY, rotation: rotation);
             zone.BuildingId = building.Id;
 
             return building;
+        }
+
+        // FR-055 : pour un bâtiment classique, le gisement exploité est toujours celui de sa propre
+        // case (aucune contrainte ici). Pour un bâtiment ExtraitEauAdjacente (pompe) : jamais
+        // directement sur une case d'eau ; accepté soit sur une case à gisement nappe phréatique
+        // (exploite son propre gisement), soit sur une case constructible adjacente à une case
+        // d'eau (exploite alors le gisement de cette case voisine, renvoyé via depositX/depositY).
+        private static bool TryResolveDepositTarget(Planet planet, BuildingDefinition definition, Zone zone, int x, int y,
+            out int depositX, out int depositY, out string reason)
+        {
+            depositX = x;
+            depositY = y;
+            reason = null;
+
+            if (!definition.ExtractsAdjacentWater) return true;
+
+            if (zone.Terrain == TerrainType.Water)
+            {
+                reason = "cannot-build-on-water";
+                return false;
+            }
+
+            if (zone.Deposit != null) return true; // nappe phréatique : gisement sur la case cible elle-même
+
+            if (TryFindAdjacentWaterZone(planet, x, y, out var adjacentX, out var adjacentY))
+            {
+                depositX = adjacentX;
+                depositY = adjacentY;
+                return true;
+            }
+
+            reason = "no-adjacent-water";
+            return false;
+        }
+
+        // 4-connexité (Nord/Sud/Est/Ouest) : aucun pathfinding/diagonale requis pour cette
+        // vérification d'adjacence simple en Phase 1.
+        private static readonly (int Dx, int Dy)[] CardinalOffsets = { (0, 1), (0, -1), (1, 0), (-1, 0) };
+
+        private static bool TryFindAdjacentWaterZone(Planet planet, int x, int y, out int foundX, out int foundY)
+        {
+            foreach (var offset in CardinalOffsets)
+            {
+                if (planet.TryGetZone(x + offset.Dx, y + offset.Dy, out var neighbor) &&
+                    neighbor.Terrain == TerrainType.Water && neighbor.Deposit != null)
+                {
+                    foundX = x + offset.Dx;
+                    foundY = y + offset.Dy;
+                    return true;
+                }
+            }
+
+            foundX = 0;
+            foundY = 0;
+            return false;
         }
 
         public void Recycle(Planet planet, BuildingInstance building, BuildingDefinition definition, Inventory inventory)
