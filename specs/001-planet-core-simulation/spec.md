@@ -563,6 +563,14 @@ d'assignation, qui change qui décide de son affectation).
   lancement de la construction, et celle-ci DOIT être refusée si l'un ou l'autre des deux coûts
   dépasse ce qui est disponible. Les Crédits Galactiques désignent la même trésorerie que celle
   définie en User Story 6 (FR-018/FR-019) : il ne s'agit pas d'une devise distincte.
+- **FR-054**: Le joueur DOIT pouvoir positionner librement un bâtiment à l'intérieur de la case
+  choisie (pas nécessairement centré) et le faire pivoter selon 4 orientations (0°/90°/180°/270°)
+  avant de valider son placement ; ce positionnement/cette orientation sont purement cosmétiques en
+  Phase 1 et n'affectent aucune règle de jeu (coût, chantier, adjacence, rendement...).
+- **FR-055**: Une pompe NE DOIT JAMAIS être construite directement sur une case d'eau ; elle DOIT
+  être construite soit sur une case constructible adjacente à une case d'eau (elle exploite alors le
+  gisement de cette case voisine), soit directement sur une case portant un gisement de type nappe
+  phréatique (elle exploite alors son propre gisement, comme un extracteur classique).
 
 ### Key Entities
 

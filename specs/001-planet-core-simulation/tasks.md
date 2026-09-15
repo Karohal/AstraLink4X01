@@ -170,7 +170,7 @@ recherche/extraction, transport.
 
 ---
 
-## Phase 6.5: Rework Module de survie & coût de construction combiné (FR-050–FR-053)
+## Phase 6.5: Rework Module de survie, placement libre & coût combiné (FR-050–FR-055)
 
 **Purpose**: Clarification de conception du 2026-09-15 (cf. spec.md FR-050 à FR-053, data-model.md
 § Module de survie / § Extracteur multifonction / § Catalogue de bâtiments), à intégrer avant les
@@ -240,6 +240,29 @@ ciblé plutôt qu'une réouverture de ces tâches.
   `CoutCreditsGalactiques` insuffisant même avec un stock de ressources suffisant dans
   `Assets/_Project/Tests/EditMode/Building/MultiPurposeExtractorServiceTests.cs` et une extension de
   `Assets/_Project/Tests/EditMode/Building/BuildingPlacementServiceTests.cs`
+
+### Positionnement libre, rotation, et contrainte d'adjacence de la pompe (FR-054/FR-055)
+
+- [ ] T092 [US2] Étendre `BuildingInstance` avec `PositionOffset` (`Vector2`, 0..1 sur chaque axe,
+  défaut `(0.5, 0.5)`) et `Rotation` (`0°/90°/180°/270°`), purement cosmétiques (FR-054, aucune
+  règle de jeu n'en dépend) ; exposer un contrôle de positionnement/rotation dans
+  `BuildingPlacementView` (T029) avant validation du placement dans
+  `Assets/_Project/Scripts/Building/BuildingInstance.cs` (dépend de T025)
+- [ ] T093 [US2] Ajouter `GisementCibleX`/`GisementCibleY` à `BuildingInstance` (coordonnées du
+  gisement réellement exploité, identiques à `Position` par défaut) ; renommer
+  `BuildingDefinition.CanBuildOnWater` en `ExtraitEauAdjacente` (FR-055) et inverser sa sémantique :
+  refuse désormais la construction sur une case d'eau elle-même, accepte une case constructible
+  adjacente à l'eau (fixe `GisementCibleX/Y` sur la case d'eau voisine) ou une case à gisement « nappe
+  phréatique » (fixe `GisementCibleX/Y` sur sa propre case) — met à jour tous les points du code qui
+  supposaient jusqu'ici `zone.Deposit` == gisement de la case du bâtiment (extraction, assignation,
+  transport) dans `Assets/_Project/Scripts/Building/BuildingDefinition.cs`,
+  `Assets/_Project/Scripts/Building/BuildingPlacementService.cs` et
+  `Assets/_Project/Scripts/Core/Phase1GameController.cs` (dépend de T025, T092)
+- [ ] T094 [P] [US2] Tests EditMode : placement refusé directement sur une case d'eau pour une pompe,
+  accepté sur une case adjacente à l'eau (extraction ciblant bien la case voisine) et sur une case à
+  gisement nappe phréatique (extraction ciblant sa propre case), positionnement/rotation persistés
+  sans effet sur le coût/la durée de chantier dans
+  `Assets/_Project/Tests/EditMode/Building/BuildingPlacementServiceTests.cs` (extension)
 
 **Checkpoint**: Le Module de survie et le catalogue de bâtiments reflètent la clarification de
 conception du 2026-09-15 ; User Story 5 peut s'appuyer sur `CoutCreditsGalactiques` (T085) pour ses

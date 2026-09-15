@@ -52,9 +52,17 @@ dessus ; `EnExtraction → Epuise` quand `QuantiteRestante` atteint 0 (FR-011).
 
 **Extension (contenu) — gisement sous case d'eau** : une case d'eau peut porter systématiquement un
 gisement d'une ressource liquide dédiée (ex: eau), extractible uniquement par un type de bâtiment
-marqué `ConstructibleSurEau = true` (pompe) — seule exception à `EstConstructible` (cf. Catalogue de
-bâtiments ci-dessous). Une « nappe phréatique » est le même gisement, situé sur une case terrestre
-normale plutôt que sous l'eau.
+marqué `ExtraitEauAdjacente = true` (pompe). Une « nappe phréatique » est le même gisement, situé
+sur une case terrestre normale plutôt que sous l'eau.
+
+**Correction 2026-09-15 (FR-055)** : contrairement à la version précédente de ce document, la pompe
+ne se construit JAMAIS directement sur une case d'eau — `Zone.EstConstructible` n'a donc plus
+d'exception liée à l'eau. La pompe se construit sur une case constructible ADJACENTE à une case
+d'eau (elle y extrait alors le gisement de la case d'eau voisine, pas le sien) OU directement sur
+une case portant un gisement de type « nappe phréatique » (elle extrait alors son propre gisement,
+comme un extracteur classique). `Batiment.GisementCibleX/GisementCibleY` (cf. § Bâtiment) porte les
+coordonnées du gisement réellement exploité, qui ne coïncident avec celles du bâtiment que dans le
+cas nappe phréatique ou pour tout extracteur non-pompe.
 
 ## Technologie (`Game.Research`)
 
@@ -95,7 +103,7 @@ normale plutôt que sous l'eau.
 | `RayonBrouillard` | `int` | Rayon de dissipation du brouillard de guerre à la construction (FR-004) |
 | `PostesEmploiDefinis` | `JobDefinition[]` | Postes ouverts par ce type de bâtiment (dont chercheur, université) |
 | `EstLogement` | `bool` | Vrai si ce type de bâtiment est un logement, site du mécanisme de naissance (FR-047) |
-| `ConstructibleSurEau` | `bool` | Vrai uniquement pour une pompe : seule exception autorisée à `Zone.EstConstructible` (extension contenu, cf. Gisement de ressource) |
+| `ExtraitEauAdjacente` | `bool` | Vrai uniquement pour une pompe : le bâtiment se construit sur une case constructible et extrait le gisement d'eau d'une case ADJACENTE (ou son propre gisement si nappe phréatique) — corrigé le 2026-09-15, cf. Gisement de ressource § Correction FR-055 |
 | `TauxRecyclage` | `float` | Fraction du `Cout` remboursée au recyclage (ex: 0.5 = 50%) ; valeur d'équilibrage du catalogue, pas fixée par la spec |
 
 **Extension (contenu) — recyclage** : le joueur peut détruire un bâtiment existant (typiquement un
@@ -130,6 +138,9 @@ d'équilibrage à définir) :
 | `PostesEmploi` | `PosteEmploi[]` | Postes ouverts par ce bâtiment une fois opérationnel (dont chercheur, université) |
 | `EstAbriInitial` | `bool` | Vrai uniquement pour le Module de survie, le bâtiment de départ (FR-007/FR-037/FR-050) |
 | `Inventaire` | `Inventory` | Uniquement pour le Module de survie (`EstAbriInitial = true`) : dotation initiale de ressources (eau, nourriture) et les `ExtracteurMultifonction` disponibles, consultable en cliquant sur le bâtiment (FR-050) |
+| `PositionCase` | `Vector2` (0..1 sur chaque axe) | Offset du bâtiment à l'intérieur de sa case, purement cosmétique en Phase 1 (aucune règle de jeu n'en dépend) ; `(0.5, 0.5)` = centré (FR-054) |
+| `Rotation` | enum `0°/90°/180°/270°` | Orientation du bâtiment, choisie par le joueur avant validation du placement, purement cosmétique en Phase 1 (FR-054) |
+| `GisementCibleX`, `GisementCibleY` | `int` | Coordonnées de la case portant le gisement réellement exploité par ce bâtiment ; identiques à `Position` sauf pour une pompe adjacente à l'eau (cf. Gisement de ressource § Correction FR-055), où elles pointent vers la case d'eau voisine |
 
 ## Extracteur multifonction (`Game.Building` ou `Game.Economy`)
 
