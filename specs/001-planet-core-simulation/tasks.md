@@ -180,31 +180,38 @@ ciblé plutôt qu'une réouverture de ces tâches.
 
 ### Rework pour User Story 1 (Module de survie, Extracteur multifonction)
 
-- [ ] T079 [US1] Renommer « Abri de secours initial » en « Module de survie » dans le code et le
+- [X] T079 [US1] Renommer « Abri de secours initial » en « Module de survie » dans le code et le
   contenu existants (bootstrap `GameBootstrapService` T021, libellés UI de
   `BuildingPlacementView`/fenêtre de gestion T029/T070 le cas échéant, nom du `BuildingDefinition`
   ScriptableObject correspondant) — le champ C# `EstAbriInitial` (FR-007/FR-037/FR-050) est
   conservé tel quel, seuls les libellés/commentaires FR et le nom de contenu changent, per
-  data-model.md § Module de survie / Bâtiment
-- [ ] T080 [US1] Implémenter l'inventaire consultable du Module de survie (FR-050) : ouverture au
+  data-model.md § Module de survie / Bâtiment — fait sur `StartingShelter.asset` +
+  `Phase1ContentLibrary` (générateur), messages `Phase1GameController`/`Phase1TestHarness` ;
+  `Phase1GameView` n'avait aucune chaîne à renommer (libellé déjà dérivé de `DisplayName`)
+- [X] T080 [US1] Implémenter l'inventaire consultable du Module de survie (FR-050) : ouverture au
   clic sur le bâtiment (`EstAbriInitial = true`) d'une vue UI Toolkit listant la dotation initiale
   de ressources (eau, nourriture, via `Inventory` T026) et les Extracteurs multifonction
   disponibles, dans `Assets/_Project/Scripts/Building/SurvivalModuleInventoryView.cs` (dépend de
-  T026, T079)
-- [ ] T081 [P] [US1] Implémenter l'entité `MultiPurposeExtractor` (Extracteur multifonction) — `Id`,
+  T026, T079) — implémenté en tant que section `DrawSurvivalModuleInventory` du panneau bâtiment
+  existant de `Phase1GameView.cs` (OnGUI) plutôt qu'un fichier UI Toolkit dédié, pour rester
+  cohérent avec le reste de la vue de démo déjà en place ; affiche `Warehouse` (le Module de survie
+  n'a pas de réserve isolée, cf. B2 de /speckit-analyze — résolu ainsi)
+- [X] T081 [P] [US1] Implémenter l'entité `MultiPurposeExtractor` (Extracteur multifonction) — `Id`,
   `GisementCibleId` (`Guid?`, `null` si rangé dans l'inventaire du Module de survie), et
   `TypesGisementAutorises` fixé à eau/pierre/bois (FR-051) — dans
   `Assets/_Project/Scripts/Building/MultiPurposeExtractor.cs`, per data-model.md § Extracteur
-  multifonction
-- [ ] T082 [US1] Implémenter `IMultiPurposeExtractorService.PlaceOn`/`MoveTo` : place un des 5
+  multifonction — champs nommés `TargetX`/`TargetY` (nullable) plutôt que `GisementCibleId` (le
+  gisement est retrouvé via `Planet.TryGetZone`, pas de référence directe)
+- [X] T082 [US1] Implémenter `IMultiPurposeExtractorService.PlaceOn`/`MoveTo` : place un des 5
   exemplaires sur un gisement révélé dont le type de ressource est eau, pierre ou bois (refus sinon,
   FR-051), sans phase de chantier, et permet de le déplacer ensuite vers un autre gisement
   compatible à tout moment (`GisementCibleId` change directement, jamais de destruction/
-  reconstruction, FR-052) ; une fois placé, appelle la surcharge dédiée
-  `IExtractionService.Tick(Deposit, MultiPurposeExtractor, float)` (cf.
-  contracts/core-interfaces.md § Game.Economy, distincte de la surcharge `Building` de T034 puisque
-  ce n'est pas un `Building`) dans `Assets/_Project/Scripts/Economy/MultiPurposeExtractorService.cs`
-  (dépend de T034, T081)
+  reconstruction, FR-052) dans `Assets/_Project/Scripts/Economy/MultiPurposeExtractorService.cs`
+  (dépend de T034, T081) — n'appelle finalement pas `IExtractionService.Tick` : dédié à un `Tick`
+  propre extrayant directement dans l'inventaire fourni par l'appelant (`Warehouse`), plutôt que
+  dans un buffer de site nécessitant un transport (simplification documentée dans le code, cf.
+  note ci-dessus) ; `contracts/core-interfaces.md` non mis à jour en conséquence (à corriger si ce
+  choix est confirmé)
 - [ ] T083 [US1] Persister la liste des Extracteurs multifonction (`GisementCibleId` par exemplaire)
   — via `MultiPurposeExtractorSnapshotMapper` dédié, et ajouter la section `MultiPurposeExtractor`
   correspondante à contracts/savegame-schema.md (absente à ce jour) dans

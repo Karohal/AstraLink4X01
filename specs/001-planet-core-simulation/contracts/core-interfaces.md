@@ -84,7 +84,23 @@ public interface IExtractionService
 {
     bool CanBuildExtractor(Deposit deposit, Technology technology); // FR-009
     void Tick(Deposit deposit, Building extractor, float deltaSimTime); // FR-010/FR-011 — extracteur fixe (construit via chantier)
-    void Tick(Deposit deposit, MultiPurposeExtractor extractor, float deltaSimTime); // FR-051/FR-052 — surcharge pour un Extracteur multifonction placé/déplacé sans chantier (pas de Building)
+}
+
+// Implémenté séparément de IExtractionService (pas de surcharge partagée) : un Extracteur
+// multifonction n'est pas un Building (pas de chantier), et sa production rejoint directement
+// l'inventaire fourni par l'appelant plutôt qu'un buffer de site nécessitant un transport dédié
+// (simplification assumée pour cet outil de secours, cf. Game.Core.Phase1GameController — verse
+// dans Warehouse) — décision prise en implémentant T082, non anticipée lors de la rédaction
+// initiale de ce contrat.
+public interface IMultiPurposeExtractorService
+{
+    bool CanPlaceOn(Planet planet, IReadOnlyCollection<string> allowedResourceIds,
+        IEnumerable<MultiPurposeExtractor> otherExtractors, int x, int y, out string reason); // FR-051
+    void PlaceOn(MultiPurposeExtractor extractor, Planet planet, IReadOnlyCollection<string> allowedResourceIds,
+        IEnumerable<MultiPurposeExtractor> otherExtractors, int x, int y); // FR-051
+    void MoveTo(MultiPurposeExtractor extractor, Planet planet, IReadOnlyCollection<string> allowedResourceIds,
+        IEnumerable<MultiPurposeExtractor> otherExtractors, int x, int y); // FR-052
+    void Tick(MultiPurposeExtractor extractor, Planet planet, Inventory targetInventory, float deltaSimTime); // FR-051/FR-052
 }
 
 public interface ITreasuryService
